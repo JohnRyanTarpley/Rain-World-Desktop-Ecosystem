@@ -63,3 +63,5 @@ Decompiled/
 # Assembly dumps. A deliberate, original native plugin must be added with `git add -f`.
 *.dll
 *.dll.meta
+/bin/swarm.ps1
+/bin/cleanup.ps1
