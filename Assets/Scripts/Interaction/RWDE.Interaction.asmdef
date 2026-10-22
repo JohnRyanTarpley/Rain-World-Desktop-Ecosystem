@@ -1,0 +1,17 @@
+{
+    "name": "RWDE.Interaction",
+    "rootNamespace": "RWDE.Interaction",
+    "references": [
+        "RWDE.Sim",
+        "RWDE.Shell"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
