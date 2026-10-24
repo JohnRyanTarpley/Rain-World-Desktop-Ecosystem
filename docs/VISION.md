@@ -23,7 +23,8 @@ intentional difference is the environment: the desktop replaces the room.
 
 ## How it runs
 
-- **A standalone background program.** Users install a built player, never Unity. It has no
+- **A standalone background program.** A .NET 8 Windows app (`rwde.exe`) drawing with Direct3D 11
+  and DirectComposition; no game engine is involved. It has no
   visible window frame, no taskbar button and no Alt-Tab entry. The user sees only the
   creatures.
 - **Rain World is required.** On start the app finds the install (the path from Settings,

@@ -1,55 +1,24 @@
 .octogent
 /bin/octogent
+/bin/swarm.ps1
+/bin/cleanup.ps1
 
-# --- Unity ---
-/[Ll]ibrary/
-/[Tt]emp/
-/[Oo]bj/
-/[Bb]uild/
-/[Bb]uilds/
-/[Ll]ogs/
-/[Uu]ser[Ss]ettings/
-/[Mm]emoryCaptures/
-/[Rr]ecordings/
-/Assets/Plugins/Editor/JetBrains*
-/Assets/AssetStoreTools*
+# --- .NET build output ---
+# Directory.Build.props sends every project's bin/ and obj/ to /artifacts.
+/artifacts/
+[Bb]in/
+[Oo]bj/
+TestResults/
+*.binlog
 
-# IDE and generated project files
+# IDE files
 .vs/
 .vscode/
 .idea/
-.gradle/
-ExportedObj/
-.consulo/
-*.csproj
-*.unityproj
-*.sln
-*.slnx
 *.suo
-*.tmp
 *.user
 *.userprefs
-*.pidb
-*.booproj
-*.svd
-*.pdb
-*.mdb
-*.opendb
-*.VC.db
-*.pidb.meta
-*.pdb.meta
-*.mdb.meta
-
-# Build and crash output
-sysinfo.txt
-*.apk
-*.aab
-*.unitypackage
-*.app
-crashlytics-build.properties
-/[Aa]ssets/[Aa]ddressable[Aa]ssets[Dd]ata/*/*.bin*
-/[Aa]ssets/[Ss]treamingAssets/aa.meta
-/[Aa]ssets/[Ss]treamingAssets/aa/*
+*.DotSettings.user
 
 # OS files
 .DS_Store
@@ -60,8 +29,5 @@ Desktop.ini
 # Game content is loaded at runtime from the user's own install; it is never committed.
 GameData/
 Decompiled/
-# Assembly dumps. A deliberate, original native plugin must be added with `git add -f`.
+# Assembly dumps. A deliberate, original native library must be added with `git add -f`.
 *.dll
-*.dll.meta
-/bin/swarm.ps1
-/bin/cleanup.ps1

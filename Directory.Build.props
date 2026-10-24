@@ -1,0 +1,14 @@
+<Project>
+  <!-- Shared settings for every project. Department boundaries are the ProjectReferences in each
+       .csproj; tests/RWDE.Tests.Common/ProjectRules.cs checks them against the allowed graph. -->
+  <PropertyGroup>
+    <LangVersion>12.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <UseArtifactsOutput>true</UseArtifactsOutput>
+    <ArtifactsPath>$(MSBuildThisFileDirectory)artifacts</ArtifactsPath>
+    <Deterministic>true</Deterministic>
+    <!-- Missing XML comments on public members are fine; the code documents what needs it. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <RootNamespace>RWDE.App</RootNamespace>
+    <!-- The command users type: rwde to start, rwde with the stop flag to end it. -->
+    <AssemblyName>rwde</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../RWDE.Sim/RWDE.Sim.csproj" />
+    <ProjectReference Include="../RWDE.GameAssets/RWDE.GameAssets.csproj" />
+    <ProjectReference Include="../RWDE.Shell/RWDE.Shell.csproj" />
+    <ProjectReference Include="../RWDE.Graphics/RWDE.Graphics.csproj" />
+    <ProjectReference Include="../RWDE.Audio/RWDE.Audio.csproj" />
+    <ProjectReference Include="../RWDE.Interaction/RWDE.Interaction.csproj" />
+    <ProjectReference Include="../RWDE.UI/RWDE.UI.csproj" />
+  </ItemGroup>
+
+</Project>
