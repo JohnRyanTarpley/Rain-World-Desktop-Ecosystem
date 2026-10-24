@@ -39,6 +39,7 @@ namespace RWDE.App
                 UserMessages.Print("Rain World Desktop Ecosystem is already running. Stop it with: rwde --stop");
                 return ExitAlreadyRunning;
             }
+            UserMessages.StartLog();
 
             var assets = GameAssetLibrary.Open();
             if (!assets.Available)

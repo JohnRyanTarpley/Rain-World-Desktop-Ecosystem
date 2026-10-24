@@ -12,11 +12,29 @@ namespace RWDE.Shell.Lifecycle
     public static class UserMessages
     {
         static bool attached;
-        static bool logStarted;
 
         /// <summary>The log of the latest run, replaced at each start.</summary>
         public static string LogPath { get; } = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RainWorldDesktop", "rwde.log");
+
+        /// <summary>
+        /// Empties the log for a new run. Only the process that owns the app instance calls this, so
+        /// <c>rwde --stop</c> and a refused second launch append to the running instance's log instead.
+        /// </summary>
+        public static void StartLog()
+        {
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(LogPath));
+                File.WriteAllText(LogPath, "");
+            }
+            catch (IOException)
+            {
+            }
+            catch (UnauthorizedAccessException)
+            {
+            }
+        }
 
         /// <summary>Writes a line to the starting terminal (if any) and the log.</summary>
         public static void Print(string text)
@@ -31,12 +49,6 @@ namespace RWDE.Shell.Lifecycle
         {
             try
             {
-                if (!logStarted)
-                {
-                    Directory.CreateDirectory(Path.GetDirectoryName(LogPath));
-                    File.WriteAllText(LogPath, "");
-                    logStarted = true;
-                }
                 File.AppendAllText(LogPath, DateTime.Now.ToString("HH:mm:ss.fff") + " " + text + Environment.NewLine);
             }
             catch (IOException)
