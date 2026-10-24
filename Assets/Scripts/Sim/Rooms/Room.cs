@@ -60,6 +60,19 @@ namespace RWDE.Sim
             public override string ToString() => "tile " + X + "," + Y + ": " + Terrain + (shortCut != 0 ? " sc" + shortCut : "");
         }
 
+        /// <summary>The game's <c>Room.SlopeDirection</c>: which way a slope tile's diagonal faces.</summary>
+        public enum SlopeDirection
+        {
+            UpLeft,
+            UpRight,
+            DownLeft,
+            DownRight,
+            Broken
+        }
+
+        /// <summary><c>Room.gravity</c>: multiplies every object's own gravity. 1 in an ordinary room.</summary>
+        public float gravity = 1f;
+
         private readonly Tile.TerrainType[,] baseTerrain;
         private readonly Dictionary<int, Pipe> pipes = new Dictionary<int, Pipe>();
         private readonly Dictionary<IntVector2, Pipe> pipeEntrances = new Dictionary<IntVector2, Pipe>();
@@ -163,6 +176,30 @@ namespace RWDE.Sim
             return new Tile(edge.X, edge.Y,
                 edge.Terrain == Tile.TerrainType.ShortcutEntrance ? Tile.TerrainType.Solid : edge.Terrain,
                 edge.verticalBeam, edge.horizontalBeam, edge.wallbehind, 0, edge.waterInt);
+        }
+
+        // ---- Slopes (Room.IdentifySlope) ----
+
+        public SlopeDirection IdentifySlope(Vector2 pos) => IdentifySlope(GetTilePosition(pos));
+        public SlopeDirection IdentifySlope(int x, int y) => IdentifySlope(new IntVector2(x, y));
+
+        /// <summary>A slope tile's direction, from which neighbours are solid; Broken for anything else.</summary>
+        public SlopeDirection IdentifySlope(IntVector2 pos)
+        {
+            if (GetTile(pos.x, pos.y).Terrain == Tile.TerrainType.Slope)
+            {
+                if (GetTile(pos.x - 1, pos.y).Terrain == Tile.TerrainType.Solid)
+                {
+                    if (GetTile(pos.x, pos.y - 1).Terrain == Tile.TerrainType.Solid) return SlopeDirection.UpRight;
+                    if (GetTile(pos.x, pos.y + 1).Terrain == Tile.TerrainType.Solid) return SlopeDirection.DownRight;
+                }
+                else if (GetTile(pos.x + 1, pos.y).Terrain == Tile.TerrainType.Solid)
+                {
+                    if (GetTile(pos.x, pos.y - 1).Terrain == Tile.TerrainType.Solid) return SlopeDirection.UpLeft;
+                    if (GetTile(pos.x, pos.y + 1).Terrain == Tile.TerrainType.Solid) return SlopeDirection.DownLeft;
+                }
+            }
+            return SlopeDirection.Broken;
         }
 
         // ---- Shortcuts (Room.shortcutData, Room.ShorcutEntranceHoleDirection) ----

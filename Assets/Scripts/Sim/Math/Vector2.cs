@@ -44,6 +44,18 @@ namespace RWDE.Sim
         public static float Distance(Vector2 a, Vector2 b) => (a - b).magnitude;
         public static float Dot(Vector2 a, Vector2 b) => a.x * b.x + a.y * b.y;
 
+        /// <summary><paramref name="vector"/> shortened to <paramref name="maxLength"/> if it is longer, as in Unity.</summary>
+        public static Vector2 ClampMagnitude(Vector2 vector, float maxLength)
+        {
+            float sqr = vector.sqrMagnitude;
+            if (sqr > maxLength * maxLength)
+            {
+                float m = (float)Math.Sqrt(sqr);
+                return new Vector2(vector.x / m * maxLength, vector.y / m * maxLength);
+            }
+            return vector;
+        }
+
         public static Vector2 Lerp(Vector2 a, Vector2 b, float t)
         {
             t = t < 0f ? 0f : t > 1f ? 1f : t;
