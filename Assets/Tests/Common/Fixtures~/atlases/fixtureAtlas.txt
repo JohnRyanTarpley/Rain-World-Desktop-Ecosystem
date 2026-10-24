@@ -1,0 +1,34 @@
+{"frames": {
+"fixtureSquare.png":
+{
+	"frame": {"x":0,"y":0,"w":32,"h":32},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":32,"h":32},
+	"sourceSize": {"w":32,"h":32}
+},
+"fixtureDot.png":
+{
+	"frame": {"x":32,"y":0,"w":8,"h":8},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":2,"y":2,"w":8,"h":8},
+	"sourceSize": {"w":12,"h":12}
+},
+"fixtureBar.png":
+{
+	"frame": {"x":40,"y":0,"w":4,"h":24},
+	"rotated": true,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":24,"h":4},
+	"sourceSize": {"w":24,"h":4}
+}},
+"meta": {
+	"app": "invented-for-tests",
+	"version": "1.0",
+	"image": "fixtureAtlas.png",
+	"format": "RGBA8888",
+	"size": {"w":64,"h":32},
+	"scale": "1"
+}
+}

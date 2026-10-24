@@ -1,0 +1,20 @@
+// Invented test region "xx". Not a real Rain World region.
+ROOMS
+XX_A01 : XX_A02, XX_S01, DISCONNECTED
+XX_A02 : XX_A01, XX_B01
+XX_B01 : XX_A02
+XX_S01 : XX_A01 : SHELTER
+END ROOMS
+
+CREATURES
+// room : den-type-count
+XX_A01 : 2-Green, 3-Pink-2
+XX_B01 : 1-Small Centipede-3
+(A,B)XX_A02 : 2-Yellow
+LINEAGE : XX_B01 : 2 : Green-0.5, Pink-0.2, NONE-0
+OFFSCREEN : 0-Vulture-1
+END CREATURES
+
+BAT MIGRATION BLOCKAGES
+XX_S01
+END BAT MIGRATION BLOCKAGES

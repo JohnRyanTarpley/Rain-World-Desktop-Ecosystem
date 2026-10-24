@@ -1,0 +1,23 @@
+{
+    "name": "RWDE.Sim.Tests",
+    "rootNamespace": "RWDE.Sim.Tests",
+    "references": [
+        "RWDE.Tests.Common",
+        "RWDE.Sim"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": true
+}
