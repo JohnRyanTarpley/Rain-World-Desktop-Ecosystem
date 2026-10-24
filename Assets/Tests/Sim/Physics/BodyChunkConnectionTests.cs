@@ -1,8 +1,7 @@
 using NUnit.Framework;
-using RWDE.Sim.Physics;
-using Type = RWDE.Sim.Physics.PhysicalObject.BodyChunkConnection.Type;
+using Type = RWDE.Sim.PhysicalObject.BodyChunkConnection.Type;
 
-namespace RWDE.Sim.Tests.Physics
+namespace RWDE.Sim.Tests
 {
     // Expected values follow PhysicalObject.BodyChunkConnection.Update: each chunk moves (and gains velocity)
     // by (distance - currentDistance) * elasticity, chunk1 taking weightSymmetry of it and chunk2 the rest.
@@ -11,7 +10,7 @@ namespace RWDE.Sim.Tests.Physics
         private const float Tolerance = 1e-4f;
 
         private static TestPair Pair(float x2, float mass1, float mass2, Type type, float elasticity, float weightSymmetry) =>
-            new TestPair(new TestRoom(20, 20), new Vector2(100f, 100f), mass1, new Vector2(x2, 100f), mass2,
+            new TestPair(new Room(20, 20), new Vector2(100f, 100f), mass1, new Vector2(x2, 100f), mass2,
                 20f, type, elasticity, weightSymmetry);
 
         [Test]
@@ -103,7 +102,7 @@ namespace RWDE.Sim.Tests.Physics
         public void ConnectedChunksFallAndRestOnFloorAtTheirDistance()
         {
             // A two-chunk body (the game's gravity 0.9 and air friction 0.999) dropped onto a floor.
-            var room = new TestRoom(20, 20).Fill(0, 0, 19, 1, TerrainType.Solid);
+            var room = new Room(20, 20).Fill(0, 0, 19, 1, Room.Tile.TerrainType.Solid);
             var pair = new TestPair(room, new Vector2(100f, 120f), 1f, new Vector2(120f, 120f), 1f,
                 20f, Type.Normal, 1f, 0.5f);
             pair.SetLocalGravity(0.9f);

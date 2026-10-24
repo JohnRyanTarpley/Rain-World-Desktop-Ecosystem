@@ -1,43 +1,18 @@
 using System.Collections.Generic;
-using RWDE.Sim.Physics;
 
-namespace RWDE.Sim.Tests.Physics
+namespace RWDE.Sim.Tests
 {
-    /// <summary>A tile grid that is all air until tiles are filled in.</summary>
-    public sealed class TestRoom : IPhysicsRoom
+    public static class RoomFill
     {
-        private readonly TerrainType[,] tiles;
-
-        public TestRoom(int width, int height)
+        /// <summary>Sets every tile in the inclusive rectangle through a terrain diff, as the shell would.</summary>
+        public static Room Fill(this Room room, int x0, int y0, int x1, int y1, Room.Tile.TerrainType terrain)
         {
-            Width = width;
-            Height = height;
-            tiles = new TerrainType[width, height];
-        }
-
-        public int Width { get; }
-        public int Height { get; }
-        public float gravity { get; set; } = 1f;
-        public float PixelWidth => Width * 20f;
-        public float PixelHeight => Height * 20f;
-
-        /// <summary>Sets every tile in the inclusive rectangle.</summary>
-        public TestRoom Fill(int x0, int y0, int x1, int y1, TerrainType terrain)
-        {
+            var diff = new TerrainDiff();
             for (int x = x0; x <= x1; x++)
                 for (int y = y0; y <= y1; y++)
-                    tiles[x, y] = terrain;
-            return this;
-        }
-
-        // Room.GetTile without a DefaultTile: outside the room reads the nearest edge tile,
-        // with a shortcut entrance reading as solid.
-        public TerrainType GetTerrain(int x, int y)
-        {
-            if (x >= 0 && y >= 0 && x < Width && y < Height)
-                return tiles[x, y];
-            var edge = tiles[System.Math.Max(0, System.Math.Min(x, Width - 1)), System.Math.Max(0, System.Math.Min(y, Height - 1))];
-            return edge == TerrainType.ShortcutEntrance ? TerrainType.Solid : edge;
+                    diff.SetTile(x, y, new TileState(terrain));
+            room.ApplyTerrainDiff(diff);
+            return room;
         }
     }
 
@@ -47,7 +22,7 @@ namespace RWDE.Sim.Tests.Physics
         public readonly List<(int chunk, IntVector2 direction, float speed, bool firstContact)> Impacts =
             new List<(int, IntVector2, float, bool)>();
 
-        public TestRock(IPhysicsRoom room, Vector2 pos)
+        public TestRock(Room room, Vector2 pos)
         {
             this.room = room;
             bodyChunks = new[] { new BodyChunk(this, 0, pos, 5f, 0.07f) };
@@ -70,7 +45,7 @@ namespace RWDE.Sim.Tests.Physics
     /// <summary>Two chunks and one connection, with no gravity and no air friction unless set.</summary>
     public sealed class TestPair : PhysicalObject
     {
-        public TestPair(IPhysicsRoom room, Vector2 pos1, float mass1, Vector2 pos2, float mass2,
+        public TestPair(Room room, Vector2 pos1, float mass1, Vector2 pos2, float mass2,
             float distance, BodyChunkConnection.Type type, float elasticity, float weightSymmetry)
         {
             this.room = room;

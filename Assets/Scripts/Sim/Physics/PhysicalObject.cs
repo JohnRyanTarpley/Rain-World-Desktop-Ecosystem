@@ -1,4 +1,4 @@
-namespace RWDE.Sim.Physics
+namespace RWDE.Sim
 {
     /// <summary>
     /// Anything in a room with a body made of <see cref="BodyChunk"/>s held together by
@@ -230,12 +230,12 @@ namespace RWDE.Sim.Physics
         /// <summary>Whether the tile offset from a chunk's tile blocks it; a one-way floor blocks only from above.</summary>
         public bool IsTileSolid(int bChunk, int relativeX, int relativeY)
         {
-            IntVector2 tile = RoomGeometry.GetTilePosition(bodyChunks[bChunk].pos) + new IntVector2(relativeX, relativeY);
-            switch (room.GetTerrain(tile))
+            IntVector2 tile = room.GetTilePosition(bodyChunks[bChunk].pos) + new IntVector2(relativeX, relativeY);
+            switch (room.GetTile(tile).Terrain)
             {
-                case TerrainType.Solid:
+                case Room.Tile.TerrainType.Solid:
                     return true;
-                case TerrainType.Floor:
+                case Room.Tile.TerrainType.Floor:
                     return relativeY < 0 && !bodyChunks[bChunk].goThroughFloors;
                 default:
                     return false;

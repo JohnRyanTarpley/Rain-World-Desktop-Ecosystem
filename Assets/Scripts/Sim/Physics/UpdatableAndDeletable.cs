@@ -1,4 +1,4 @@
-namespace RWDE.Sim.Physics
+namespace RWDE.Sim
 {
     /// <summary>Base of everything a room ticks, as the game's <c>UpdatableAndDeletable</c>.</summary>
     public class UpdatableAndDeletable
@@ -6,7 +6,7 @@ namespace RWDE.Sim.Physics
         /// <summary>Flips every tick; deferred moves (<see cref="BodyChunk.setPos"/>) key off it.</summary>
         public bool evenUpdate;
 
-        public IPhysicsRoom room;
+        public Room room;
 
         public bool slatedForDeletetion { get; set; }
 

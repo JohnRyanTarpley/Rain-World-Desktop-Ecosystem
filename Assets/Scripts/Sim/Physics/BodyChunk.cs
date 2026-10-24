@@ -1,4 +1,4 @@
-namespace RWDE.Sim.Physics
+namespace RWDE.Sim
 {
     /// <summary>
     /// One circular mass of a <see cref="PhysicalObject"/>, ported from the game's <c>BodyChunk</c>:
@@ -107,7 +107,7 @@ namespace RWDE.Sim.Physics
             }
             if (!owner.IsGrabbed)
             {
-                IPhysicsRoom room = owner.room;
+                Room room = owner.room;
                 if (pos.x < -restrictInRoomRange)
                 {
                     vel.x = 0f;
@@ -175,23 +175,23 @@ namespace RWDE.Sim.Physics
         // first solid tile with open space on the side the chunk came from.
         private void CheckHorizontalCollision()
         {
-            IPhysicsRoom room = owner.room;
+            Room room = owner.room;
             contactPoint.x = 0;
-            IntVector2 tilePosition = RoomGeometry.GetTilePosition(lastPos);
+            IntVector2 tilePosition = room.GetTilePosition(lastPos);
             int repeats = 0;
             if (vel.x > 0f)
             {
-                int xEnd = RoomGeometry.GetTilePosition(new Vector2(pos.x + TerrainRad + 0.01f, 0f)).x;
-                int xStart = RoomGeometry.GetTilePosition(new Vector2(lastPos.x + TerrainRad, 0f)).x;
-                int yTop = RoomGeometry.GetTilePosition(new Vector2(0f, pos.y + TerrainRad - 1f)).y;
-                int yBottom = RoomGeometry.GetTilePosition(new Vector2(0f, pos.y - TerrainRad + 1f)).y;
+                int xEnd = room.GetTilePosition(new Vector2(pos.x + TerrainRad + 0.01f, 0f)).x;
+                int xStart = room.GetTilePosition(new Vector2(lastPos.x + TerrainRad, 0f)).x;
+                int yTop = room.GetTilePosition(new Vector2(0f, pos.y + TerrainRad - 1f)).y;
+                int yBottom = room.GetTilePosition(new Vector2(0f, pos.y - TerrainRad + 1f)).y;
                 bool hit = false;
                 for (int i = xStart; i <= xEnd && !hit; i++)
                 {
                     for (int j = yBottom; j <= yTop && !hit; j++)
                     {
-                        if (room.GetTerrain(i, j) == TerrainType.Solid && room.GetTerrain(i - 1, j) != TerrainType.Solid
-                            && (tilePosition.x < i || room.GetTerrain(lastPos) == TerrainType.Solid))
+                        if (room.GetTile(i, j).Terrain == Room.Tile.TerrainType.Solid && room.GetTile(i - 1, j).Terrain != Room.Tile.TerrainType.Solid
+                            && (tilePosition.x < i || room.GetTile(lastPos).Terrain == Room.Tile.TerrainType.Solid))
                         {
                             pos.x = i * 20f - TerrainRad;
                             if (vel.x > owner.impactTreshhold)
@@ -213,17 +213,17 @@ namespace RWDE.Sim.Physics
             }
             else if (vel.x < 0f)
             {
-                int xEnd = RoomGeometry.GetTilePosition(new Vector2(pos.x - TerrainRad - 0.01f, 0f)).x;
-                int xStart = RoomGeometry.GetTilePosition(new Vector2(lastPos.x - TerrainRad, 0f)).x;
-                int yTop = RoomGeometry.GetTilePosition(new Vector2(0f, pos.y + TerrainRad - 1f)).y;
-                int yBottom = RoomGeometry.GetTilePosition(new Vector2(0f, pos.y - TerrainRad + 1f)).y;
+                int xEnd = room.GetTilePosition(new Vector2(pos.x - TerrainRad - 0.01f, 0f)).x;
+                int xStart = room.GetTilePosition(new Vector2(lastPos.x - TerrainRad, 0f)).x;
+                int yTop = room.GetTilePosition(new Vector2(0f, pos.y + TerrainRad - 1f)).y;
+                int yBottom = room.GetTilePosition(new Vector2(0f, pos.y - TerrainRad + 1f)).y;
                 bool hit = false;
                 for (int i = xStart; i >= xEnd && !hit; i--)
                 {
                     for (int j = yBottom; j <= yTop && !hit; j++)
                     {
-                        if (room.GetTerrain(i, j) == TerrainType.Solid && room.GetTerrain(i + 1, j) != TerrainType.Solid
-                            && (tilePosition.x > i || room.GetTerrain(lastPos) == TerrainType.Solid))
+                        if (room.GetTile(i, j).Terrain == Room.Tile.TerrainType.Solid && room.GetTile(i + 1, j).Terrain != Room.Tile.TerrainType.Solid
+                            && (tilePosition.x > i || room.GetTile(lastPos).Terrain == Room.Tile.TerrainType.Solid))
                         {
                             pos.x = (i + 1f) * 20f + TerrainRad;
                             if (vel.x < -owner.impactTreshhold)
@@ -249,23 +249,23 @@ namespace RWDE.Sim.Physics
         // floors (solid or one-way) when falling. A landing bounce smaller than gravity is killed.
         private void CheckVerticalCollision()
         {
-            IPhysicsRoom room = owner.room;
+            Room room = owner.room;
             contactPoint.y = 0;
-            IntVector2 tilePosition = RoomGeometry.GetTilePosition(lastPos);
+            IntVector2 tilePosition = room.GetTilePosition(lastPos);
             int repeats = 0;
             if (pos.y > lastPos.y)
             {
-                int yEnd = RoomGeometry.GetTilePosition(new Vector2(0f, pos.y + TerrainRad + 0.01f)).y;
-                int yStart = RoomGeometry.GetTilePosition(new Vector2(0f, lastPos.y + TerrainRad)).y;
-                int xLeft = RoomGeometry.GetTilePosition(new Vector2(pos.x - TerrainRad + 1f, 0f)).x;
-                int xRight = RoomGeometry.GetTilePosition(new Vector2(pos.x + TerrainRad - 1f, 0f)).x;
+                int yEnd = room.GetTilePosition(new Vector2(0f, pos.y + TerrainRad + 0.01f)).y;
+                int yStart = room.GetTilePosition(new Vector2(0f, lastPos.y + TerrainRad)).y;
+                int xLeft = room.GetTilePosition(new Vector2(pos.x - TerrainRad + 1f, 0f)).x;
+                int xRight = room.GetTilePosition(new Vector2(pos.x + TerrainRad - 1f, 0f)).x;
                 bool hit = false;
                 for (int i = yStart; i <= yEnd && !hit; i++)
                 {
                     for (int j = xLeft; j <= xRight && !hit; j++)
                     {
-                        if (room.GetTerrain(j, i) == TerrainType.Solid && room.GetTerrain(j, i - 1) != TerrainType.Solid
-                            && (tilePosition.y < i || room.GetTerrain(lastPos) == TerrainType.Solid))
+                        if (room.GetTile(j, i).Terrain == Room.Tile.TerrainType.Solid && room.GetTile(j, i - 1).Terrain != Room.Tile.TerrainType.Solid
+                            && (tilePosition.y < i || room.GetTile(lastPos).Terrain == Room.Tile.TerrainType.Solid))
                         {
                             pos.y = i * 20f - TerrainRad;
                             if (vel.y > owner.impactTreshhold)
@@ -287,17 +287,17 @@ namespace RWDE.Sim.Physics
             }
             else if (pos.y < lastPos.y)
             {
-                int yEnd = RoomGeometry.GetTilePosition(new Vector2(0f, pos.y - TerrainRad - 0.01f)).y;
-                int yStart = RoomGeometry.GetTilePosition(new Vector2(0f, lastPos.y - TerrainRad)).y;
-                int xLeft = RoomGeometry.GetTilePosition(new Vector2(pos.x - TerrainRad + 1f, 0f)).x;
-                int xRight = RoomGeometry.GetTilePosition(new Vector2(pos.x + TerrainRad - 1f, 0f)).x;
+                int yEnd = room.GetTilePosition(new Vector2(0f, pos.y - TerrainRad - 0.01f)).y;
+                int yStart = room.GetTilePosition(new Vector2(0f, lastPos.y - TerrainRad)).y;
+                int xLeft = room.GetTilePosition(new Vector2(pos.x - TerrainRad + 1f, 0f)).x;
+                int xRight = room.GetTilePosition(new Vector2(pos.x + TerrainRad - 1f, 0f)).x;
                 bool hit = false;
                 for (int i = yStart; i >= yEnd && !hit; i--)
                 {
                     for (int j = xLeft; j <= xRight && !hit; j++)
                     {
                         if (SolidFloor(j, i) && !SolidFloor(j, i + 1)
-                            && (tilePosition.y > i || room.GetTerrain(lastPos) == TerrainType.Solid))
+                            && (tilePosition.y > i || room.GetTile(lastPos).Terrain == Room.Tile.TerrainType.Solid))
                         {
                             pos.y = (i + 1f) * 20f + TerrainRad;
                             if (vel.y < -owner.impactTreshhold)
@@ -323,59 +323,59 @@ namespace RWDE.Sim.Physics
         // tile it overlaps, and nudges it downhill on a floor slope.
         private void CheckAgainstSlopesVertically()
         {
-            IPhysicsRoom room = owner.room;
-            IntVector2 tilePosition = RoomGeometry.GetTilePosition(pos);
+            Room room = owner.room;
+            IntVector2 tilePosition = room.GetTilePosition(pos);
             IntVector2 offset = new IntVector2(0, 0);
-            SlopeDirection slopeDirection = room.IdentifySlope(pos);
-            Vector2 middle = RoomGeometry.MiddleOfTile(pos);
-            if (room.GetTerrain(pos) != TerrainType.Slope)
+            Room.SlopeDirection slopeDirection = room.IdentifySlope(pos);
+            Vector2 middle = room.MiddleOfTile(pos);
+            if (room.GetTile(pos).Terrain != Room.Tile.TerrainType.Slope)
             {
-                if (room.IdentifySlope(tilePosition.x - 1, tilePosition.y) != SlopeDirection.Broken && pos.x - slopeRad <= middle.x - 10f)
+                if (room.IdentifySlope(tilePosition.x - 1, tilePosition.y) != Room.SlopeDirection.Broken && pos.x - slopeRad <= middle.x - 10f)
                 {
                     slopeDirection = room.IdentifySlope(tilePosition.x - 1, tilePosition.y);
                     offset.x = -1;
                 }
-                else if (room.IdentifySlope(tilePosition.x + 1, tilePosition.y) != SlopeDirection.Broken && pos.x + slopeRad >= middle.x + 10f)
+                else if (room.IdentifySlope(tilePosition.x + 1, tilePosition.y) != Room.SlopeDirection.Broken && pos.x + slopeRad >= middle.x + 10f)
                 {
                     slopeDirection = room.IdentifySlope(tilePosition.x + 1, tilePosition.y);
                     offset.x = 1;
                 }
                 else if (pos.y - slopeRad < middle.y - 10f)
                 {
-                    if (room.IdentifySlope(tilePosition.x, tilePosition.y - 1) != SlopeDirection.Broken)
+                    if (room.IdentifySlope(tilePosition.x, tilePosition.y - 1) != Room.SlopeDirection.Broken)
                     {
                         slopeDirection = room.IdentifySlope(tilePosition.x, tilePosition.y - 1);
                         offset.y = -1;
                     }
                 }
-                else if (pos.y + slopeRad > middle.y + 10f && room.IdentifySlope(tilePosition.x, tilePosition.y + 1) != SlopeDirection.Broken)
+                else if (pos.y + slopeRad > middle.y + 10f && room.IdentifySlope(tilePosition.x, tilePosition.y + 1) != Room.SlopeDirection.Broken)
                 {
                     slopeDirection = room.IdentifySlope(tilePosition.x, tilePosition.y + 1);
                     offset.y = 1;
                 }
             }
-            if (slopeDirection == SlopeDirection.Broken)
+            if (slopeDirection == Room.SlopeDirection.Broken)
             {
                 return;
             }
 
-            Vector2 tileMiddle = RoomGeometry.MiddleOfTile(RoomGeometry.GetTilePosition(pos) + offset);
+            Vector2 tileMiddle = room.MiddleOfTile(room.GetTilePosition(pos) + offset);
             int downhill = 0;
             float surfaceY;
             int side;
-            if (slopeDirection == SlopeDirection.UpLeft)
+            if (slopeDirection == Room.SlopeDirection.UpLeft)
             {
                 downhill = -1;
                 surfaceY = pos.x - (tileMiddle.x - 10f) + (tileMiddle.y - 10f);
                 side = -1;
             }
-            else if (slopeDirection == SlopeDirection.UpRight)
+            else if (slopeDirection == Room.SlopeDirection.UpRight)
             {
                 downhill = 1;
                 surfaceY = 20f - (pos.x - (tileMiddle.x - 10f)) + (tileMiddle.y - 10f);
                 side = -1;
             }
-            else if (slopeDirection == SlopeDirection.DownLeft)
+            else if (slopeDirection == Room.SlopeDirection.DownLeft)
             {
                 surfaceY = 20f - (pos.x - (tileMiddle.x - 10f)) + (tileMiddle.y - 10f);
                 side = 1;
@@ -410,13 +410,13 @@ namespace RWDE.Sim.Physics
         // BodyChunk.SolidFloor: a one-way floor holds only while the whole object was above it last tick.
         private bool SolidFloor(int x, int y)
         {
-            IPhysicsRoom room = owner.room;
-            TerrainType terrain = room.GetTerrain(x, y);
-            if (terrain == TerrainType.Solid)
+            Room room = owner.room;
+            Room.Tile.TerrainType terrain = room.GetTile(x, y).Terrain;
+            if (terrain == Room.Tile.TerrainType.Solid)
             {
                 return true;
             }
-            if (terrain == TerrainType.Floor && !goThroughFloors)
+            if (terrain == Room.Tile.TerrainType.Floor && !goThroughFloors)
             {
                 float lowest = room.PixelHeight;
                 for (int i = 0; i < owner.bodyChunks.Length; i++)
@@ -426,7 +426,7 @@ namespace RWDE.Sim.Physics
                         lowest = owner.bodyChunks[i].lastPos.y;
                     }
                 }
-                return RoomGeometry.GetTilePosition(new Vector2(0f, lowest)).y > y;
+                return room.GetTilePosition(new Vector2(0f, lowest)).y > y;
             }
             return false;
         }

@@ -1,8 +1,7 @@
 using System;
 using NUnit.Framework;
-using RWDE.Sim.Physics;
 
-namespace RWDE.Sim.Tests.Physics
+namespace RWDE.Sim.Tests
 {
     // Expected values are worked out by hand from the game's BodyChunk.Update and its collision checks,
     // using the game's Rock constants: rad 5, gravity 0.9, airFriction 0.999, bounce 0.4, surfaceFriction 0.4.
@@ -12,7 +11,7 @@ namespace RWDE.Sim.Tests.Physics
         private const float Tolerance = 1e-4f;
 
         // Tiles 0-1 solid: the floor's top surface is y = 40, so a resting rock sits at y = 45.
-        private static TestRoom FloorRoom() => new TestRoom(20, 20).Fill(0, 0, 19, 1, TerrainType.Solid);
+        private static Room FloorRoom() => new Room(20, 20).Fill(0, 0, 19, 1, Room.Tile.TerrainType.Solid);
 
         private static void Tick(PhysicalObject obj, int ticks = 1)
         {
@@ -26,7 +25,7 @@ namespace RWDE.Sim.Tests.Physics
         [Test]
         public void FallingChunkAcceleratesWithGravityAndAirFriction()
         {
-            var rock = new TestRock(new TestRoom(20, 40), new Vector2(110f, 600f));
+            var rock = new TestRock(new Room(20, 40), new Vector2(110f, 600f));
             var chunk = rock.firstChunk;
 
             Tick(rock);
@@ -125,7 +124,7 @@ namespace RWDE.Sim.Tests.Physics
         [Test]
         public void SlidingChunkStopsAgainstWall()
         {
-            var room = FloorRoom().Fill(8, 2, 8, 5, TerrainType.Solid);
+            var room = FloorRoom().Fill(8, 2, 8, 5, Room.Tile.TerrainType.Solid);
             var rock = new TestRock(room, new Vector2(150f, 45f));
             var chunk = rock.firstChunk;
             chunk.vel = new Vector2(10f, 0f);
@@ -145,7 +144,7 @@ namespace RWDE.Sim.Tests.Physics
         [Test]
         public void FastChunkBouncesOffWall()
         {
-            var room = new TestRoom(20, 20).Fill(8, 0, 8, 19, TerrainType.Solid);
+            var room = new Room(20, 20).Fill(8, 0, 8, 19, Room.Tile.TerrainType.Solid);
             var rock = new TestRock(room, new Vector2(150f, 100f));
             var chunk = rock.firstChunk;
             chunk.vel = new Vector2(30f, 0f);
@@ -162,7 +161,7 @@ namespace RWDE.Sim.Tests.Physics
         [Test]
         public void ChunkMovingLeftHitsWallOnItsLeft()
         {
-            var room = FloorRoom().Fill(2, 2, 2, 5, TerrainType.Solid);
+            var room = FloorRoom().Fill(2, 2, 2, 5, Room.Tile.TerrainType.Solid);
             var rock = new TestRock(room, new Vector2(70f, 45f));
             var chunk = rock.firstChunk;
             chunk.vel = new Vector2(-10f, 0f);
@@ -179,7 +178,7 @@ namespace RWDE.Sim.Tests.Physics
         [Test]
         public void RisingChunkHitsCeiling()
         {
-            var room = new TestRoom(20, 20).Fill(0, 10, 19, 10, TerrainType.Solid);
+            var room = new Room(20, 20).Fill(0, 10, 19, 10, Room.Tile.TerrainType.Solid);
             var rock = new TestRock(room, new Vector2(110f, 180f));
             var chunk = rock.firstChunk;
             chunk.vel = new Vector2(5f, 20f);
@@ -197,7 +196,7 @@ namespace RWDE.Sim.Tests.Physics
         [Test]
         public void OneWayFloorHoldsFromAboveUnlessGoingThroughFloors()
         {
-            var room = FloorRoom().Fill(0, 4, 19, 4, TerrainType.Floor);
+            var room = FloorRoom().Fill(0, 4, 19, 4, Room.Tile.TerrainType.Floor);
 
             var rock = new TestRock(room, new Vector2(110f, 120f));
             Tick(rock, 100);
@@ -212,7 +211,7 @@ namespace RWDE.Sim.Tests.Physics
         [Test]
         public void ChunkJumpsUpThroughOneWayFloorAndLandsOnIt()
         {
-            var room = FloorRoom().Fill(0, 4, 19, 4, TerrainType.Floor);
+            var room = FloorRoom().Fill(0, 4, 19, 4, Room.Tile.TerrainType.Floor);
             var rock = new TestRock(room, new Vector2(110f, 60f));
             rock.firstChunk.vel = new Vector2(0f, 15f);
 
@@ -225,8 +224,8 @@ namespace RWDE.Sim.Tests.Physics
         public void ChunkOnSlopeSitsOnTheDiagonalAndSlidesDownhill()
         {
             // Tile (5, 2) is a slope with solid to its left and below: UpRight, high on the left.
-            var room = FloorRoom().Fill(4, 2, 4, 2, TerrainType.Solid).Fill(5, 2, 5, 2, TerrainType.Slope);
-            Assert.AreEqual(SlopeDirection.UpRight, room.IdentifySlope(5, 2));
+            var room = FloorRoom().Fill(4, 2, 4, 2, Room.Tile.TerrainType.Solid).Fill(5, 2, 5, 2, Room.Tile.TerrainType.Slope);
+            Assert.AreEqual(Room.SlopeDirection.UpRight, room.IdentifySlope(5, 2));
             var rock = new TestRock(room, new Vector2(110f, 60f));
             var chunk = rock.firstChunk;
 
@@ -250,9 +249,24 @@ namespace RWDE.Sim.Tests.Physics
         }
 
         [Test]
+        public void IdentifySlopeReadsTheSolidNeighbours()
+        {
+            const Room.Tile.TerrainType S = Room.Tile.TerrainType.Solid, L = Room.Tile.TerrainType.Slope;
+            // Each slope tile at (2, 2) gets one solid side neighbour and one solid vertical neighbour.
+            Room Slope(int sideX, int vertY) => new Room(5, 5).Fill(2, 2, 2, 2, L).Fill(sideX, 2, sideX, 2, S).Fill(2, vertY, 2, vertY, S);
+
+            Assert.AreEqual(Room.SlopeDirection.UpRight, Slope(1, 1).IdentifySlope(2, 2));
+            Assert.AreEqual(Room.SlopeDirection.DownRight, Slope(1, 3).IdentifySlope(2, 2));
+            Assert.AreEqual(Room.SlopeDirection.UpLeft, Slope(3, 1).IdentifySlope(2, 2));
+            Assert.AreEqual(Room.SlopeDirection.DownLeft, Slope(3, 3).IdentifySlope(2, 2));
+            Assert.AreEqual(Room.SlopeDirection.Broken, new Room(5, 5).Fill(2, 2, 2, 2, L).IdentifySlope(2, 2));
+            Assert.AreEqual(Room.SlopeDirection.Broken, Slope(1, 1).IdentifySlope(1, 2), "a solid tile is not a slope");
+        }
+
+        [Test]
         public void ChunkLeavesRoomRangeClampedWhenNotGrabbed()
         {
-            var room = new TestRoom(10, 10);
+            var room = new Room(10, 10);
             var rock = new TestRock(room, new Vector2(100f, 100f));
             rock.firstChunk.vel = new Vector2(-2000f, 0f);
 
@@ -265,7 +279,7 @@ namespace RWDE.Sim.Tests.Physics
         [Test]
         public void ObjectGravityScalesWithRoomGravity()
         {
-            var room = new TestRoom(10, 10) { gravity = 0.5f };
+            var room = new Room(10, 10) { gravity = 0.5f };
             var rock = new TestRock(room, new Vector2(100f, 100f));
 
             Assert.AreEqual(0.45f, rock.gravity, 1e-6f);
@@ -275,8 +289,8 @@ namespace RWDE.Sim.Tests.Physics
         [Test]
         public void IsTileSolidTreatsOneWayFloorAsSolidOnlyBelow()
         {
-            var room = new TestRoom(10, 10).Fill(5, 4, 5, 4, TerrainType.Floor).Fill(6, 5, 6, 5, TerrainType.Solid);
-            var rock = new TestRock(room, RoomGeometry.MiddleOfTile(5, 5));
+            var room = new Room(10, 10).Fill(5, 4, 5, 4, Room.Tile.TerrainType.Floor).Fill(6, 5, 6, 5, Room.Tile.TerrainType.Solid);
+            var rock = new TestRock(room, room.MiddleOfTile(5, 5));
 
             Assert.IsTrue(rock.IsTileSolid(0, 0, -1));
             Assert.IsTrue(rock.IsTileSolid(0, 1, 0));
@@ -288,7 +302,7 @@ namespace RWDE.Sim.Tests.Physics
         [Test]
         public void SetPosIsAppliedOnTheNextUpdateInsteadOfVelocity()
         {
-            var rock = new TestRock(new TestRoom(20, 20), new Vector2(100f, 100f));
+            var rock = new TestRock(new Room(20, 20), new Vector2(100f, 100f));
             rock.evenUpdate = true;
             rock.firstChunk.MoveFromOutsideMyUpdate(false, new Vector2(200f, 300f));
             Assert.AreEqual(100f, rock.firstChunk.pos.x, "deferred while the object is out of step");
@@ -298,16 +312,6 @@ namespace RWDE.Sim.Tests.Physics
             Assert.AreEqual(200f, rock.firstChunk.pos.x);
             Assert.AreEqual(300f, rock.firstChunk.pos.y);
             Assert.IsFalse(rock.firstChunk.setPos.HasValue);
-        }
-
-        [Test]
-        public void TilePositionMatchesGameRounding()
-        {
-            Assert.AreEqual(new IntVector2(0, 0), RoomGeometry.GetTilePosition(new Vector2(0f, 19.99f)));
-            Assert.AreEqual(new IntVector2(1, 1), RoomGeometry.GetTilePosition(new Vector2(20f, 20f)));
-            // (int) truncates toward zero after the +20 offset, so -20 < x < 0 is tile -1 ... as in the game.
-            Assert.AreEqual(new IntVector2(-1, -1), RoomGeometry.GetTilePosition(new Vector2(-0.5f, -19.5f)));
-            Assert.AreEqual(new Vector2(110f, 50f), RoomGeometry.MiddleOfTile(5, 2));
         }
     }
 }
