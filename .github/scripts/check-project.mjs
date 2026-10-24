@@ -68,7 +68,9 @@ const forbidden = [
   [/\.dll$/i, "assembly"],
   [/(^|\/)Decompiled\//i, "decompiled code"],
   [/(^|\/)GameData\//i, "game data"],
-  [/(^|\/)(RainWorld_Data|StreamingAssets)\//i, "game install content"],
+  [/(^|\/)RainWorld_Data\//i, "game install content"],
+  // Unity's own Assets/StreamingAssets/ is allowed; a StreamingAssets folder anywhere else is a game copy.
+  [/^(?!Assets\/StreamingAssets\/)(.*\/)?StreamingAssets\//i, "game install content"],
   [/Assembly-CSharp/i, "game assembly or its decompilation"],
 ];
 for (const file of tracked) {
