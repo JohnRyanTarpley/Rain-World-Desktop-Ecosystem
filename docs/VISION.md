@@ -15,11 +15,33 @@ intentional difference is the environment: the desktop replaces the room.
   reference (see "Game reference" below) as the source of truth. Don't guess and don't
   "make it feel similar".
 - **Sprites, palettes and sounds are the game's own,** loaded at runtime from the user's
-  Rain World install. Placeholder shapes exist only as a fallback when no install is found,
-  and for tests.
+  Rain World install. A Rain World install is required: without one the app does not run
+  (see "How it runs"). Placeholder shapes exist only for tests.
 - **Spawning uses the game's own data.** Which creatures appear, how often and in what
   lineages comes from the Outskirts world files in the user's install. It is not a
   hand-written table.
+
+## How it runs
+
+- **A standalone background program.** Users install a built player, never Unity. It has no
+  visible window frame, no taskbar button and no Alt-Tab entry. The user sees only the
+  creatures.
+- **Rain World is required.** On start the app finds the install (the path from Settings,
+  then the Steam libraries). If none is found it shows a clear message saying what it looked
+  for and exits. It never falls back to placeholder art.
+- **Two display modes, swapped instantly** by a setting or the global shortcut
+  Ctrl+Alt+Shift+R:
+  - **Desktop mode (default):** creatures live on the desktop layer, behind every app
+    window, like an animated wallpaper with the desktop icons as terrain.
+  - **Topmost mode:** creatures draw on top of every app. Exploratory: parts of the screen,
+    such as window edges and title bars, may become terrain in this mode.
+- **The taskbar stays visible** and is terrain in both modes. Creatures can crawl over it and
+  sometimes cover taskbar icons. In desktop mode this needs its own small topmost surface
+  over the taskbar, because the desktop layer sits beneath the taskbar.
+- **Quitting:** hold Escape for 8 seconds (detected globally, since the app never has
+  focus), or run the stop command from a terminal. There is no tray icon or quit button.
+- **Installed and removed from the terminal.** Install, uninstall, start, stop and
+  start-at-login all work from a terminal.
 
 ## The desktop as a Rain World room
 
@@ -30,14 +52,18 @@ terrain like this:
 |---|---|
 | A desktop icon | A block of solid terrain |
 | A row of icons | A ledge or floor |
-| **Two icon columns side by side** | **A pipe (shortcut).** Creatures that use shortcuts in the game enter at one end, travel inside the pipe exactly as they do in the game, and come out at the other end. They do not climb the outside of the icons. |
+| **Two icon columns side by side** | **A tunnel.** Creatures move through it as they move through tunnels in the game. |
 | A single icon column | A solid pillar. Only creatures that can climb walls in the game climb it. |
-| The taskbar | The floor |
+| The taskbar | The floor. Creatures can walk over it and cover taskbar icons. |
 | The screen edges | Room exits to the offscreen world. Creatures arrive and leave through them. |
 | The top of the screen | The sky, where flying creatures enter and leave |
+| **Each monitor** | **A separate room.** Rooms connect through pipes (shortcuts), which creatures that use shortcuts in the game travel through exactly as they do in the game. |
 
 Every creature uses its own in-game movement rules on this terrain. No creature gets
 desktop-specific abilities.
+
+Multi-monitor support is built against a fake monitor layout in tests, because the operator
+has one monitor. Real multi-monitor runs need a second display or a virtual display driver.
 
 ## Creature roster: the Outskirts
 
