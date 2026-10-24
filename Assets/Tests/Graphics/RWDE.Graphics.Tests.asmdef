@@ -5,6 +5,7 @@
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner",
         "RWDE.Tests.Common",
+        "RWDE.Sim",
         "RWDE.Graphics"
     ],
     "includePlatforms": [
