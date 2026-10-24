@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 namespace RWDE.Shell.Native
 {
     /// <summary>P/Invoke into dwmapi.dll.</summary>
-    public static class Dwm
+    internal static partial class Dwm
     {
         [StructLayout(LayoutKind.Sequential)]
         public struct MARGINS
