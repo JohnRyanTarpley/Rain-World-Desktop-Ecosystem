@@ -1,0 +1,14 @@
+using NUnit.Framework;
+using RWDE.Tests.Common;
+
+namespace RWDE.Interaction.Tests
+{
+    public class InteractionBoundaryTests
+    {
+        [Test]
+        public void AsmdefFollowsDependencyRules()
+        {
+            AsmdefRules.AssertFollowsRules("RWDE.Interaction");
+        }
+    }
+}

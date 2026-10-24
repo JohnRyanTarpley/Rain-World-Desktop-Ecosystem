@@ -1,0 +1,10 @@
+[MERGE]
+ROOMS
+XX_B01 : XX_A02, XX_C01
+XX_C01 : XX_B01
+END ROOMS
+CREATURES
+XX_C01 : 1-Blue
+END CREATURES
+[ENDMERGE]
+[ADD]// added by the invented fixture mod
