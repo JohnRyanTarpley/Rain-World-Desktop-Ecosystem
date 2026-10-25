@@ -1,0 +1,13 @@
+{
+  "comment": "A 400x400 screen (20x20 tiles), no taskbar, and two columns of three 60x60 icons side by side, with a pixel or two of jitter: a tunnel down the seam at x 160.",
+  "screen": [0, 0, 400, 400],
+  "taskbar": null,
+  "icons": [
+    [101, 40, 160, 100],
+    [100, 99, 159, 160],
+    [102, 161, 161, 220],
+    [160, 41, 221, 100],
+    [159, 100, 220, 159],
+    [161, 160, 220, 221]
+  ]
+}
