@@ -6,8 +6,9 @@ namespace RWDE.Sim
     /// </summary>
     public readonly struct ShortcutData
     {
-        // ShortcutData.Type. Desktop pipes are always Normal; DeadEnd is what the game returns for a
-        // tile with no shortcut. The other types are kept so ported code can name them.
+        // ShortcutData.Type. A desktop pipe inside a room is Normal and half of a pipe to another
+        // monitor room is a RoomExit; DeadEnd is what the game returns for a tile with no shortcut.
+        // The other types are kept so ported code can name them.
         public enum Type
         {
             Normal,
@@ -29,6 +30,7 @@ namespace RWDE.Sim
         }
 
         public readonly Type shortCutType;
+        /// <summary>For a room exit, the node it leads to (its index in <see cref="Room.exitAndDenIndex"/>); otherwise -1.</summary>
         public readonly int destNode;
         /// <summary>Tiles from <see cref="StartTile"/> to <see cref="DestTile"/>, both included.</summary>
         public readonly IntVector2[] path;

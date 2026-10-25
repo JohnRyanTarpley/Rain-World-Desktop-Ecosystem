@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace RWDE.Sim
 {
@@ -9,9 +10,9 @@ namespace RWDE.Sim
     /// Get it from <see cref="Room.aimap"/>; the room keeps it current as terrain diffs arrive.
     /// </summary>
     /// <remarks>
-    /// Not ported yet: the per-creature pre-processed data (<c>CreatureSpecificAImap</c>: exit distances,
-    /// accessibility maps, triangulation), which arrives with the pathfinder, and visibility, which stays 0.
-    /// The game's room access modifiers, Watcher terrain curves and zero-gravity lizard rules have no
+    /// The per-creature pre-processed data (<see cref="Sim.CreatureSpecificAImap"/>: exit distances, node
+    /// connectivity, accessibility) is built on first use and dropped when the terrain changes. Visibility
+    /// is not ported and stays 0. The game's room access modifiers, Watcher terrain curves and zero-gravity lizard rules have no
     /// desktop counterpart: the desktop has none of the first two and <see cref="Room.gravity"/> is always 1.
     /// </remarks>
     public sealed class AImap
@@ -72,6 +73,14 @@ namespace RWDE.Sim
         public bool TileAccessibleToCreature(int x, int y, CreatureTemplate crit) => TileAccessibleToCreature(new IntVector2(x, y), crit);
 
         public bool TileAccessibleToCreature(Vector2 pos, CreatureTemplate crit) => TileAccessibleToCreature(room.GetTilePosition(pos), crit);
+
+        /// <summary>A node (no tile) counts as accessible when the creature may be offscreen (<c>AImap.WorldCoordinateAccessibleToCreature</c>).</summary>
+        public bool WorldCoordinateAccessibleToCreature(WorldCoordinate pos, CreatureTemplate crit)
+        {
+            if (!pos.TileDefined)
+                return crit.AccessibilityResistance(AItile.Accessibility.OffScreen).Allowed;
+            return TileAccessibleToCreature(pos.Tile, crit);
+        }
 
         /// <summary>Whether <paramref name="crit"/> may be on the tile at all (<c>AImap.TileAccessibleToCreature</c>).</summary>
         public bool TileAccessibleToCreature(IntVector2 pos, CreatureTemplate crit)
@@ -134,6 +143,7 @@ namespace RWDE.Sim
         }
 
         public PathCost TileCostForCreature(int x, int y, CreatureTemplate crit) => TileCostForCreature(new IntVector2(x, y), crit);
+        public PathCost TileCostForCreature(WorldCoordinate pos, CreatureTemplate crit) => TileCostForCreature(pos.Tile, crit);
 
         /// <summary>What standing on the tile costs <paramref name="crit"/> (<c>AImap.TileCostForCreature</c>).</summary>
         public PathCost TileCostForCreature(IntVector2 pos, CreatureTemplate crit)
@@ -155,7 +165,7 @@ namespace RWDE.Sim
         {
             var start = connection.StartTile;
             var dest = connection.DestTile;
-            if (!TileAccessibleToCreature(start, crit) || !TileAccessibleToCreature(dest, crit)
+            if (!WorldCoordinateAccessibleToCreature(connection.startCoord, crit) || !WorldCoordinateAccessibleToCreature(connection.destinationCoord, crit)
                 || !crit.ConnectionResistance(connection.type).Allowed)
                 return false;
 
@@ -216,6 +226,77 @@ namespace RWDE.Sim
             return cost + TileCostForCreature(connection.DestTile, crit);
         }
 
+        // ---- Creature-specific maps (AImap.CreatureSpecificAImap, ExitDistanceForCreature, ...) ----
+
+        // Keyed by the template that owns the pre-baked pathing data, so creatures that share it share a map.
+        private readonly Dictionary<CreatureTemplate, CreatureSpecificAImap> creatureSpecificAImaps =
+            new Dictionary<CreatureTemplate, CreatureSpecificAImap>();
+
+        /// <summary>
+        /// The pre-processed map for <paramref name="crit"/>'s pre-baked pathing, built on first use;
+        /// null for a creature without pre-baked pathing.
+        /// </summary>
+        public CreatureSpecificAImap CreatureSpecificAImap(CreatureTemplate crit)
+        {
+            var owner = crit.doPreBakedPathing ? crit : crit.preBakedPathingAncestor;
+            if (owner == null || crit.PreBakedPathingIndex == -1)
+                return null;
+            if (!creatureSpecificAImaps.TryGetValue(owner, out var map))
+                creatureSpecificAImaps[owner] = map = AIdataPreprocessor.Build(this, owner);
+            return map;
+        }
+
+        public int TriangulateDistance(IntVector2 A, IntVector2 B, CreatureTemplate crit) =>
+            CreatureSpecificAImap(crit).TriangulateDistance(A, B);
+
+        public int TriangulateDistance(WorldCoordinate A, WorldCoordinate B, CreatureTemplate crit) =>
+            A.room != B.room ? int.MaxValue : CreatureSpecificAImap(crit).TriangulateDistance(A.Tile, B.Tile);
+
+        public float AccessibilityForCreature(IntVector2 pos, CreatureTemplate crit) =>
+            crit.PreBakedPathingIndex < 0 ? 0f : CreatureSpecificAImap(crit).GetAccessibility(pos.x, pos.y);
+
+        public int ExitDistanceForCreatureAndCheckNeighbours(IntVector2 pos, int creatureSpecificExitIndex, CreatureTemplate crit)
+        {
+            if (creatureSpecificExitIndex < 0)
+                return -1;
+            var map = CreatureSpecificAImap(crit);
+            for (int i = 0; i < 5; i++)
+            {
+                var p = pos + Custom.fourDirectionsAndZero[i];
+                if (map.GetDistanceToExit(p.x, p.y, creatureSpecificExitIndex) > -1)
+                    return map.GetDistanceToExit(p.x, p.y, creatureSpecificExitIndex);
+            }
+            return -1;
+        }
+
+        /// <summary>
+        /// Steps from the tile to <paramref name="crit"/>'s <paramref name="creatureSpecificExitIndex"/>-th
+        /// node: -1 off its tiles, 0 where the node is out of reach (<c>AImap.ExitDistanceForCreature</c>).
+        /// </summary>
+        public int ExitDistanceForCreature(IntVector2 pos, int creatureSpecificExitIndex, CreatureTemplate crit)
+        {
+            if (!TileAccessibleToCreature(pos, crit))
+                return -1;
+            return CreatureSpecificAImap(crit).GetDistanceToExit(pos.x, pos.y, creatureSpecificExitIndex);
+        }
+
+        public int ExitDistanceForCreature(Vector2 pos, int exitNumber, CreatureTemplate crit) =>
+            ExitDistanceForCreature(room.GetTilePosition(pos), exitNumber, crit);
+
+        public bool ExitReachableFromTile(IntVector2 pos, int globalNodeIndex, CreatureTemplate crit) =>
+            ExitDistanceForCreature(pos, room.abstractRoom.CommonToCreatureSpecificNodeIndex(globalNodeIndex, crit), crit) > 0;
+
+        public bool AnyExitReachableFromTile(IntVector2 pos, CreatureTemplate crit)
+        {
+            if (crit.PreBakedPathingIndex == -1)
+                return false;
+            var map = CreatureSpecificAImap(crit);
+            for (int i = 0; i < map.numberOfNodes; i++)
+                if (map.GetDistanceToExit(pos.x, pos.y, i) > 0)
+                    return true;
+            return false;
+        }
+
         // ---- Terrain changes ----
 
         /// <summary>
@@ -225,7 +306,9 @@ namespace RWDE.Sim
         public void ApplyTerrainChanges(TerrainChanges changes)
         {
             if (changes == null) throw new ArgumentNullException(nameof(changes));
-            if (changes.Any) new AImapper(this).Rebuild(changes);
+            if (!changes.Any) return;
+            new AImapper(this).Rebuild(changes);
+            creatureSpecificAImaps.Clear();
         }
 
         private static int Clamp(int v, int min, int max) => v < min ? min : v > max ? max : v;

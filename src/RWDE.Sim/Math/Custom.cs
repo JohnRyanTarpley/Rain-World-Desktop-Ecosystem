@@ -26,6 +26,13 @@ namespace RWDE.Sim
             new IntVector2(1, 0), new IntVector2(1, 1), new IntVector2(0, 1), new IntVector2(-1, 1)
         };
 
+        // Custom.eightDirectionsAndZero: zero, then anticlockwise (y up) from left.
+        public static readonly IntVector2[] eightDirectionsAndZero =
+        {
+            new IntVector2(0, 0), new IntVector2(-1, 0), new IntVector2(-1, -1), new IntVector2(0, -1), new IntVector2(1, -1),
+            new IntVector2(1, 0), new IntVector2(1, 1), new IntVector2(0, 1), new IntVector2(-1, 1)
+        };
+
         // Custom.PerpIntVec
         public static IntVector2 PerpIntVec(IntVector2 intVec) => new IntVector2(intVec.y, -intVec.x);
 
@@ -34,5 +41,12 @@ namespace RWDE.Sim
 
         // Custom.DistLess
         public static bool DistLess(Vector2 a, Vector2 b, float dist) => (a - b).magnitude < dist;
+        public static bool DistLess(IntVector2 a, IntVector2 b, float dist) => DistLess(a.ToVector2(), b.ToVector2(), dist);
+
+        // Custom.InsideRect: edges included.
+        public static bool InsideRect(IntVector2 vec, IntRect rect) => InsideRect(vec.x, vec.y, rect);
+
+        public static bool InsideRect(int x, int y, IntRect rect) =>
+            x >= rect.left && x <= rect.right && y >= rect.bottom && y <= rect.top;
     }
 }
