@@ -168,15 +168,43 @@ Families share one implementation.
 | | Monster Kelp | `TentaclePlant` | Base |
 | Overseers | Overseer | `Overseer` | Base |
 | Other | Hazer | `Hazer` | Placed in one Outskirts room; check before building it |
+| Slugcats | Wild slugcat | `SlugNPC` | Downpour; not in the Outskirts spawns (see "The wild slugcat") |
 
 **Build order:** the lizards come first because one implementation covers 11 creatures and
 exercises the physics, pathing, pipes and graphics. Batflies follow, since they're the
-everyday food, and then the rest in the order of the table.
+everyday food, and then the rest in the order of the table, except that the wild slugcat
+comes straight after the batflies.
 
 **Campaign spawn tables:** the game changes Outskirts spawns per campaign. The app offers a
 setting to pick one campaign's table, or "All Outskirts creatures" (the default), which
 merges every installed campaign so every installed creature above can appear. A user with
 only the base game sees only the base creatures and campaigns (see "Installed DLC").
+
+## The wild slugcat
+
+A slugcat lives on the desktop alongside the Outskirts creatures. **Nobody controls it:**
+the app has no player and takes no input for the slugcat. It is run by the game's own AI for
+slugcats, Downpour's `SlugNPCAI`, the AI behind slugpups in the campaigns and in Arena
+sandbox.
+
+- **Full-grown, as in the game.** It is a `SlugNPC` with `PlayerState.forceFullGrown` set,
+  as the game does for the slugcats Gourmand's ending spawns
+  (`MSCRoomSpecificScript`). It has the adult slugcat's body, movement and graphics.
+- **Wild.** `SlugNPCAI`'s behaviours that need a player (following a friend, being carried,
+  riding on a head) never trigger, because there is no player. What remains is the game's
+  own: idling, foraging, picking up and throwing items, fleeing and fighting. Offscreen it
+  uses `SlugNPCAbstractAI`, which seeks out swarm rooms.
+- **Downpour only.** `SlugNPC` is a Downpour creature, so with Downpour missing or switched
+  off there is no slugcat (see "Installed DLC").
+- **Arrival.** Slugcat is in no Outskirts spawn table, so the app adds it: at most one is on
+  the desktop at a time, and it arrives from the offscreen world through a screen exit like
+  any other creature. One that dies or leaves can come back in a later cycle.
+- **Lineages.** In the game a lineage only moves on when the player kills its creature.
+  A wild slugcat's kills are not a player's (the game checks for the `Slugcat` type, not
+  `SlugNPC`), so they don't move lineages on.
+- **The port.** The game's slugcat is the largest piece of code on the roster (`Player`,
+  `PlayerGraphics`, `SlugNPCAI`). Port what `SlugNPCAI` drives, 1:1, rather than the
+  player-input paths.
 
 ## Operator decisions
 
@@ -189,6 +217,8 @@ The only places where the app intentionally departs from the game:
 | The cycle length can be set anywhere from 1 min to 23 h 59 min, or the rain turned off, in settings. The game's length is the default. | 2026-10-24 |
 | A hold-for-3-seconds reset button in settings clears all creatures and restarts as after a downpour. | 2026-10-24 |
 | Two icon columns side by side form a tunnel (terrain), not a pipe. | 2026-10-24 |
+| A full-grown wild slugcat, run by the game's `SlugNPCAI` with no player, lives on the desktop when Downpour is installed. The Outskirts never spawns one. | 2026-10-25 |
+| Creatures that never roam between rooms in the game (Infant Centipedes) come out of their den into a desktop room, which stands in for their home room. Scavengers travel to the desktop on `ScavengerAbstractAI`'s migration timer without forming squads. | 2026-10-25 |
 
 ## Rules that apply to everyone
 
