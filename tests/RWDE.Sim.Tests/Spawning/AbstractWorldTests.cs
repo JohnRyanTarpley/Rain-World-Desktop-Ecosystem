@@ -361,6 +361,19 @@ namespace RWDE.Sim.Tests.Spawning
         }
 
         [Test]
+        public void AnInfantCentipedeTurnedAwayTriesAgain()
+        {
+            // The realizer refuses the first try, as when the exit is shut on the way; that trip never
+            // got in, so it doesn't count as leaving.
+            var (world, realizer, _) = Setup(2, "YY_A02 : 4-Small Centipede");
+            realizer.Accept = false;
+            Assert.AreNotEqual(-1, RunUntil(world, () => realizer.PosWhenRealized.Count > 0, 3000));
+
+            realizer.Accept = true;
+            Assert.AreNotEqual(-1, RunUntil(world, () => realizer.Realized.Count == 1, 3000));
+        }
+
+        [Test]
         public void ScavengersComeInOnTheirOwnMigrationTimer()
         {
             var (world, realizer, _) = Setup(4, "OFFSCREEN : 0-Scavenger-3");

@@ -100,6 +100,8 @@ namespace RWDE.Sim
         public Place place = Place.InRoom;
         /// <summary>The exit it is travelling to, entered through, or last left by; null for one placed in its room.</summary>
         public RoomExit exit;
+        /// <summary>It has been in a desktop room and left it; a trip that never got in doesn't count.</summary>
+        public bool leftARoom;
         /// <summary>The tile it was realized at.</summary>
         public IntVector2 entryTile;
 

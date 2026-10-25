@@ -147,6 +147,8 @@ namespace RWDE.Sim
                         continue;
                     }
                     lineageCounters[lineage.denString] = counter;
+                    // Unlike a simple spawner, a lineage spawns a simulated creature even for a
+                    // quantified type such as a batfly: GeneratePopulation checks quantified only there.
                     var template = staticWorld.GetCreatureTemplate(type.Value);
                     if (template != null) Spawn(template, lineage, lineage.CurrentSpawnData(counter));
                 }
@@ -209,6 +211,7 @@ namespace RWDE.Sim
                 throw new InvalidOperationException(creature + " is not a spawned creature in a room.");
             realizer?.Abstractize(creature);
             GoOffscreen(creature, exit);
+            creature.leftARoom = true;
         }
 
         /// <summary>Removes a creature from the world for good (killed, or cleared by a reset).</summary>
@@ -296,10 +299,11 @@ namespace RWDE.Sim
 
             // Creatures that never roam between rooms (Infant Centipedes) come out of their den into
             // their own room in the game. The desktop room stands in for it, so they come straight in
-            // from the den. One that has been in a room and left (the rain, or blocked terrain) stays
-            // offscreen until the next population, as it would never wander back in the game.
+            // from the den, and try again if the way in is shut. One that has been in a room and left
+            // (the rain, or blocked terrain) stays offscreen until the next population, as it would
+            // never wander back in the game.
             if (template.roamBetweenRoomsChance < 0f && !Stationary(template))
-                return c.exit == null;
+                return !c.leftARoom;
 
             if (c.timeSpentHere <= RandomRange(0, template.abstractedLaziness)) return false;
             return TimeInfluencedRandomRoll(template.roamBetweenRoomsChance * Mathf.Lerp(2f, 0.1f, OffscreenAttraction), 1);
