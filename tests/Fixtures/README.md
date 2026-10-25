@@ -17,3 +17,4 @@ so no binaries are committed.
 | `world/xx/world_xx.txt` | World file: `ROOMS`, `CREATURES` and `BAT MIGRATION BLOCKAGES` sections, `//` comments, a `(A,B)` campaign filter. |
 | `modify/world/xx/world_xx.txt` | Mod `modify` file with a `[MERGE]` ... `[ENDMERGE]` block and an `[ADD]` line. |
 | `atlases/fixtureAtlas.txt` | Futile atlas data (TexturePacker JSON hash) for a 64x32 texture. |
+| `desktop/*.json` | Desktop layouts for the terrain rasteriser: `screen`, `taskbar` (or null) and `icons`, each rectangle `[left, top, right, bottom]` in virtual-screen pixels. |

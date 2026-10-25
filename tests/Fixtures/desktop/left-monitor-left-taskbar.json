@@ -1,0 +1,8 @@
+{
+  "comment": "A 1920x1080 monitor left of the primary (negative x) with an 80 px taskbar docked on its left edge and one icon touching the right edge.",
+  "screen": [-1920, 0, 0, 1080],
+  "taskbar": [-1920, 0, -1840, 1080],
+  "icons": [
+    [-80, 100, 0, 180]
+  ]
+}
