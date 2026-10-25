@@ -368,6 +368,39 @@ namespace RWDE.Sim.Tests.AI
             Assert.IsTrue(ai.Pather.lookingForImpossiblePath);
         }
 
+        [Test]
+        public void ARemoteDestinationsNodeIsWorkedOutAgainWhenThatRoomsExitsAreRenumbered()
+        {
+            // Three monitors: left, middle, right. At first only link 8 joins the middle room to the right one.
+            var (left, right) = Monitors(false);
+            var middle = Parse(
+                "##############",
+                "##..........##",
+                "##..........##",
+                "##..........##",
+                "##############");
+            middle.ApplyTerrainDiff(new TerrainDiff().AddPipe(new Pipe(2, new[] { T(12, 1), T(13, 1) }, roomLink: 8)));
+            right.ApplyTerrainDiff(new TerrainDiff().AddPipe(new Pipe(1, new[] { T(1, 1), T(0, 1) }, roomLink: 8)));
+            var world = new World(1, left, middle, right);
+            var ai = Spawn(world, right, Type.PinkLizard, T(5, 1), right.GetWorldCoordinate(T(5, 1)));
+            world.Update();
+            ai.Update();
+            ai.SetDestination(middle.GetWorldCoordinate(T(11, 1)));
+            Assert.AreEqual(0, ai.Pather.GetDestination.abstractNode, "the middle room's only exit");
+
+            // Plugging in link 7 on the middle room's left side puts its exit first in scan order, so node 0
+            // is now the exit to the left room. The destination still sits by the exit to the right room.
+            left.ApplyTerrainDiff(new TerrainDiff().AddPipe(new Pipe(1, new[] { T(9, 1), T(10, 1) }, roomLink: 7)));
+            middle.ApplyTerrainDiff(new TerrainDiff().AddPipe(new Pipe(1, new[] { T(1, 1), T(0, 1) }, roomLink: 7)));
+            Assert.AreEqual(left.abstractRoom.index, middle.abstractRoom.connections[0], "exits renumbered");
+            world.Update();
+            ai.Update();
+
+            Assert.AreEqual(middle.abstractRoom.ExitIndex(right.abstractRoom.index), ai.Pather.GetDestination.abstractNode,
+                "the node nearest the destination tile, not whatever now has the old number");
+            Assert.AreEqual(T(11, 1), ai.Pather.GetDestination.Tile);
+        }
+
         // ---- Pre-processed exit data (CreatureSpecificAImap, node connectivity) ----
 
         [Test]
