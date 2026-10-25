@@ -53,15 +53,23 @@ namespace RWDE.Sim
                 return table;
             }
 
+            // A spawner is the same in two campaigns when it spawns the same thing in the same den and is
+            // the same repeat of it: two identical entries in one campaign are two spawners. Each line
+            // resolves "cicada" once for every campaign, so a shared line can't come out as A in one and
+            // B in another and spawn twice.
             var list = (campaigns ?? Campaign.All).ToList();
             var merged = new SpawnTable(RegionName, list);
             var seen = new HashSet<string>();
+            var lineSeeds = random == null ? null : new Dictionary<string, int>();
             foreach (var campaign in list)
             {
-                var table = Build(campaign.Timeline, random);
+                var table = Build(campaign.Timeline, random, lineSeeds);
+                var repeats = new Dictionary<string, int>();
                 foreach (var spawner in table.spawners)
                 {
-                    if (!seen.Add(spawner.Signature)) continue;
+                    repeats.TryGetValue(spawner.Signature, out int repeat);
+                    repeats[spawner.Signature] = repeat + 1;
+                    if (!seen.Add(spawner.Signature + "#" + repeat.ToString(CultureInfo.InvariantCulture))) continue;
                     int sameDen = merged.spawners.Count(s => s is World.Lineage && s.den == spawner.den);
                     merged.spawners.Add(spawner.Renumbered(merged.spawners.Count, sameDen > 0 ? sameDen + 1 : 0));
                 }
@@ -92,8 +100,10 @@ namespace RWDE.Sim
         }
 
         // The world file as WorldLoader reads it for one timeline: preprocess each line, then read the
-        // CONDITIONAL LINKS, ROOMS and CREATURES blocks.
-        private SpawnTable Build(string timeline, Random random)
+        // CONDITIONAL LINKS, ROOMS and CREATURES blocks. With lineSeeds, each creature line draws its
+        // random choices from a generator seeded once per line text, shared by every build that passes
+        // the same dictionary.
+        private SpawnTable Build(string timeline, Random random, Dictionary<string, int> lineSeeds = null)
         {
             var lines = new List<string>();
             foreach (var raw in worldLines)
@@ -155,10 +165,20 @@ namespace RWDE.Sim
                 if (roomTags[i].Contains("SWARMROOM") && !hidden.Contains(rooms[i]))
                     table.swarmRooms.Add(rooms[i]);
 
+            // Hidden and exclusive rooms keep their spawns: the game only takes them off the map and
+            // out of the swarm rooms (World.DisabledMapRooms).
             var roomSet = new HashSet<string>(rooms);
             foreach (var line in creatureLines)
-                if (!WorldLoader.AddSpawnersFromLine(line, roomSet.Contains, table.spawners, table.unknownCreatures, random))
+            {
+                var lineRandom = random;
+                if (lineSeeds != null)
+                {
+                    if (!lineSeeds.TryGetValue(line, out int seed)) lineSeeds[line] = seed = random.Next();
+                    lineRandom = new Random(seed);
+                }
+                if (!WorldLoader.AddSpawnersFromLine(line, roomSet.Contains, table.spawners, table.unknownCreatures, lineRandom))
                     table.unreadableLines.Add(line);
+            }
 
             table.fliesPerSwarmRoom = Enumerable.Repeat(BatsPerActiveSwarmRoom(timeline), table.swarmRooms.Count).ToArray();
             return table;

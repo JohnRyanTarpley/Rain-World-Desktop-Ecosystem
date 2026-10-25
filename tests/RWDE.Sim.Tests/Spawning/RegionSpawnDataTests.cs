@@ -96,6 +96,41 @@ namespace RWDE.Sim.Tests.Spawning
         }
 
         [Test]
+        public void ASharedCicadaLineIsResolvedOnceForEveryCampaign()
+        {
+            // Resolved per campaign, the line could come out CicadaA for one and CicadaB for another and
+            // spawn twice in the merged table.
+            var data = Inline("ROOMS", "YY_A01 : YY_A02", "END ROOMS", "CREATURES",
+                "YY_A01 : 2-cicada-2", "LINEAGE : YY_A01 : 3 : cicada-0", "END CREATURES");
+            for (int seed = 0; seed < 32; seed++)
+            {
+                var all = data.BuildTable(Campaign.AllOutskirtsCreatures, null, new System.Random(seed));
+                Assert.AreEqual(2, all.Spawners.Count, "seed " + seed);
+            }
+        }
+
+        [Test]
+        public void RepeatedSpawnersWithinACampaignSurviveTheMerge()
+        {
+            // Two identical lineages in one den are two creatures with their own counters.
+            var data = Inline("ROOMS", "YY_A01 : YY_A02", "END ROOMS", "CREATURES",
+                "LINEAGE : YY_A01 : 2 : Pink-0.5, Red-0",
+                "LINEAGE : YY_A01 : 2 : Pink-0.5, Red-0",
+                "YY_A01 : 3-Green, 3-Green",
+                "END CREATURES");
+
+            var white = data.BuildTable("White");
+            var whiteOnly = data.BuildTable(Campaign.AllOutskirtsCreatures, new[] { Campaign.White });
+            var all = data.BuildTable(Campaign.AllOutskirtsCreatures);
+
+            Assert.AreEqual(4, white.Spawners.Count);
+            CollectionAssert.AreEqual(Describe(white), Describe(whiteOnly));
+            CollectionAssert.AreEqual(Describe(white), Describe(all));
+            CollectionAssert.AreEqual(new[] { "YY_A01.2", "YY_A01.2;2" },
+                all.Spawners.OfType<World.Lineage>().Select(l => l.denString));
+        }
+
+        [Test]
         public void SwarmRoomsGetTheRegionsBatCount()
         {
             var white = Fixture().BuildTable("White");
