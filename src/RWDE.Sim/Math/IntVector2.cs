@@ -26,6 +26,10 @@ namespace RWDE.Sim
         /// <summary>Truncates toward zero, as the game's <c>IntVector2.FromVector2</c> does.</summary>
         public static IntVector2 FromVector2(Vector2 v) => new IntVector2((int)v.x, (int)v.y);
 
+        /// <summary>Clamps each component to [-1, 1] (<c>IntVector2.ClampAtOne</c>).</summary>
+        public static IntVector2 ClampAtOne(IntVector2 a) =>
+            new IntVector2(a.x < -1 ? -1 : a.x > 1 ? 1 : a.x, a.y < -1 ? -1 : a.y > 1 ? 1 : a.y);
+
         public float FloatDist(IntVector2 other) => Vector2.Distance(ToVector2(), other.ToVector2());
 
         public bool Equals(IntVector2 other) => x == other.x && y == other.y;
