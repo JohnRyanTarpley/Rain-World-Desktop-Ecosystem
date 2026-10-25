@@ -64,11 +64,10 @@ namespace RWDE.Sim.Tests.Spawning
 
         private static (World world, FakeRealizer realizer, Room room) Setup(int seed, params string[] creatureLines)
         {
-            var world = new World(All, Table(creatureLines), seed);
-            var realizer = new FakeRealizer();
             var room = DesktopRoom();
+            var world = new World(All, Table(creatureLines), seed, room);
+            var realizer = new FakeRealizer();
             world.realizer = realizer;
-            world.AddRoom(room);
             world.GeneratePopulation();
             return (world, realizer, room);
         }
@@ -109,7 +108,7 @@ namespace RWDE.Sim.Tests.Spawning
         public void SpawnsWhoseDlcIsOffAreLeftOut()
         {
             var table = Table("YY_A01 : 2-Caramel, 3-Green", "OFFSCREEN : 0-MirosVulture-2");
-            var world = new World(StaticWorld.Init(StaticWorld.Dlc.BaseOnly), table, 1);
+            var world = new World(StaticWorld.Init(StaticWorld.Dlc.BaseOnly), table, 1, DesktopRoom());
             world.GeneratePopulation();
 
             CollectionAssert.AreEqual(new[] { Type.GreenLizard }, world.Creatures.Select(c => c.creatureTemplate.type));
@@ -148,7 +147,8 @@ namespace RWDE.Sim.Tests.Spawning
             foreach (var (creature, tile, inward) in realizer.Realized)
             {
                 Assert.IsTrue(creature.Realized);
-                Assert.AreSame(room, creature.room);
+                Assert.AreSame(room, creature.Room.realizedRoom);
+                Assert.AreEqual(room.GetWorldCoordinate(tile), creature.pos);
                 Assert.AreEqual(1, tile.y, "a lizard can only stand on the floor tiles of the edge openings");
                 Assert.That(tile.x, Is.EqualTo(0).Or.EqualTo(room.Width - 1));
                 Assert.AreEqual(tile.x == 0 ? new IntVector2(1, 0) : new IntVector2(-1, 0), inward);
@@ -219,7 +219,8 @@ namespace RWDE.Sim.Tests.Spawning
             world.CreatureLeftRoom(lizard, exit);
 
             Assert.AreEqual(AbstractCreature.Place.Offscreen, lizard.place);
-            Assert.IsNull(lizard.room);
+            Assert.IsNull(lizard.Room);
+            Assert.AreEqual(AbstractCreature.OffscreenPos, lizard.pos);
             Assert.AreSame(exit, lizard.exit);
             CollectionAssert.AreEqual(new[] { lizard }, realizer.Abstracted);
             Assert.Throws<System.InvalidOperationException>(() => world.CreatureLeftRoom(lizard, exit));
@@ -305,21 +306,37 @@ namespace RWDE.Sim.Tests.Spawning
 
             Assert.AreNotEqual(-1, RunUntil(world, () => realizer.Placed.Count == 2));
             Assert.IsEmpty(realizer.Realized);
-            Assert.IsTrue(world.Creatures.All(c => c.Realized && c.room == room && c.exit == null));
+            Assert.IsTrue(world.Creatures.All(c => c.Realized && c.Room.realizedRoom == room && c.exit == null));
         }
 
         [Test]
-        public void RemovingARoomSendsItsCreaturesOffscreen()
+        public void ArrivalsComeIntoEveryRoomOfTheWorld()
         {
-            var (world, realizer, room) = Setup(2, "OFFSCREEN : 0-Green-2");
-            RunUntil(world, () => realizer.Realized.Count == 2);
+            var left = DesktopRoom();
+            var right = DesktopRoom();
+            var world = new World(All, Table("OFFSCREEN : 0-Green-12"), 4, left, right);
+            var realizer = new FakeRealizer();
+            world.realizer = realizer;
+            world.GeneratePopulation();
 
-            world.RemoveRoom(room);
+            Assert.AreNotEqual(-1, RunUntil(world, () => realizer.Realized.Count == 12));
+            CollectionAssert.AreEquivalent(new[] { 0, 1 }, world.Creatures.Select(c => c.pos.room).Distinct());
+        }
 
-            Assert.IsTrue(world.Creatures.All(c => c.place == AbstractCreature.Place.Offscreen && c.room == null));
-            Assert.AreEqual(2, realizer.Abstracted.Count);
-            for (int t = 0; t < 2000; t++) world.Update();
-            Assert.AreEqual(2, realizer.Realized.Count, "no room, no arrivals");
+        [Test]
+        public void PathfindingCreaturesOutsideTheSpawnerAreLeftAlone()
+        {
+            var room = DesktopRoom();
+            var world = new World(1, room);
+            var lizard = new AbstractCreature(world, All.GetCreatureTemplate(Type.GreenLizard), room.GetWorldCoordinate(new IntVector2(3, 1)));
+
+            world.Update();
+
+            Assert.IsTrue(lizard.Realized);
+            Assert.IsNull(world.SpawnTable);
+            Assert.IsEmpty(world.Creatures);
+            Assert.Throws<System.InvalidOperationException>(() => world.GeneratePopulation());
+            Assert.Throws<System.InvalidOperationException>(() => world.CreatureLeftRoom(lizard, null));
         }
 
         [Test]
@@ -366,8 +383,8 @@ namespace RWDE.Sim.Tests.Spawning
                 "(White)YY_A01 : 2-Green", "(Red)YY_A01 : 3-Red", "END CREATURES"
             });
 
-            var white = World.Create(All, data, "White", 1);
-            var all = World.Create(All, data, Campaign.AllOutskirtsCreatures, 1);
+            var white = World.Create(All, data, "White", 1, null, DesktopRoom());
+            var all = World.Create(All, data, Campaign.AllOutskirtsCreatures, 1, null, DesktopRoom());
 
             CollectionAssert.AreEqual(new[] { Type.GreenLizard }, white.Creatures.Select(c => c.creatureTemplate.type));
             CollectionAssert.AreEquivalent(new[] { Type.GreenLizard, Type.RedLizard }, all.Creatures.Select(c => c.creatureTemplate.type));

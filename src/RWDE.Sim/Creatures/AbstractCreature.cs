@@ -1,36 +1,16 @@
-using System;
 using System.Collections.Generic;
 
 namespace RWDE.Sim
 {
-    /// <summary>The game's <c>EntityID</c>: the spawner that made an entity (-1 for none) and a running number.</summary>
-    public readonly struct EntityID : IEquatable<EntityID>
-    {
-        public EntityID(int spawner, int number)
-        {
-            this.spawner = spawner;
-            this.number = number;
-        }
-
-        public readonly int spawner;
-        public readonly int number;
-
-        public bool Equals(EntityID other) => spawner == other.spawner && number == other.number;
-        public override bool Equals(object obj) => obj is EntityID other && Equals(other);
-        public override int GetHashCode() => HashCode.Combine(spawner, number);
-        public static bool operator ==(EntityID a, EntityID b) => a.Equals(b);
-        public static bool operator !=(EntityID a, EntityID b) => !a.Equals(b);
-        public override string ToString() => "ID." + spawner + "." + number;
-    }
-
     /// <summary>
-    /// A creature as the world knows it while it is offscreen, mirroring the game's
-    /// <c>AbstractCreature</c>. It waits in its spawn den, roams the offscreen world, travels to an exit
+    /// A creature as the world sees it, ported from the game's <c>AbstractCreature</c>: its template,
+    /// world, position and abstract AI, which the pathfinder reads, plus what the spawner needs. A
+    /// spawned creature waits in its spawn den offscreen, roams the offscreen world, travels to an exit
     /// of a desktop room and is realized there; leaving through an exit makes it abstract again.
     /// </summary>
-    public sealed class AbstractCreature
+    public class AbstractCreature
     {
-        /// <summary>Where the creature is.</summary>
+        /// <summary>Where a spawned creature is.</summary>
         public enum Place
         {
             /// <summary>In its spawn den offscreen (the game's <c>InDen</c>).</summary>
@@ -43,30 +23,46 @@ namespace RWDE.Sim
             InRoom
         }
 
+        /// <summary>Nowhere in the world's rooms: offscreen.</summary>
+        public static readonly WorldCoordinate OffscreenPos = new WorldCoordinate(-1, -1, -1, -1);
+
+        public AbstractCreature(World world, CreatureTemplate creatureTemplate, WorldCoordinate pos)
+        {
+            this.world = world;
+            this.creatureTemplate = creatureTemplate;
+            this.pos = pos;
+            abstractAI = new AbstractCreatureAI(world, this);
+        }
+
         /// <remarks>
         /// The game's <c>GeneratePopulation</c> copies the spawner's <c>nightCreature</c> and then calls
         /// <c>setCustomFlags</c>, which clears it again, so only a <c>{Night}</c> flag in the spawn data counts.
         /// </remarks>
-        internal AbstractCreature(CreatureTemplate template, EntityID id, World.Den spawnDen, string spawnData)
+        internal AbstractCreature(World world, CreatureTemplate creatureTemplate, EntityID id, World.Den spawnDen, string spawnData)
+            : this(world, creatureTemplate, OffscreenPos)
         {
-            creatureTemplate = template;
             ID = id;
             this.spawnDen = spawnDen;
             this.spawnData = spawnData;
+            place = Place.InDen;
             setCustomFlags();
         }
 
+        public World world;
         public readonly CreatureTemplate creatureTemplate;
-        public readonly EntityID ID;
+        /// <summary>Where the creature is: its room and tile, and the node it last entered through or is heading for.</summary>
+        public WorldCoordinate pos;
+        public AbstractCreatureAI abstractAI;
+
+        public readonly EntityID ID = new EntityID(-1, -1);
         /// <summary>The den it was spawned in (<c>spawnDen</c>).</summary>
-        public readonly World.Den spawnDen;
+        public readonly World.Den spawnDen = new World.Den(null, -1);
         /// <summary>The spawner's <c>{...}</c> attribute group, or null.</summary>
         public readonly string spawnData;
 
-        public Place place = Place.InDen;
-        /// <summary>The room it is in, or heading for; null offscreen.</summary>
-        public Room room;
-        /// <summary>The exit it is travelling to, entered through, or last left by.</summary>
+        /// <summary>Where it is; a creature made outside the spawner counts as in its room.</summary>
+        public Place place = Place.InRoom;
+        /// <summary>The exit it is travelling to, entered through, or last left by; null for one placed in its room.</summary>
         public RoomExit exit;
         /// <summary>The tile it was realized at.</summary>
         public IntVector2 entryTile;
@@ -89,6 +85,8 @@ namespace RWDE.Sim
         public bool Winterized;
         public bool rippleCreature;
         public readonly List<string> unrecognizedFlags = new List<string>();
+
+        public AbstractRoom Room => world.GetAbstractRoom(pos);
 
         public bool InDen => place == Place.InDen;
         public bool Realized => place == Place.InRoom;
@@ -140,29 +138,28 @@ namespace RWDE.Sim
             }
         }
 
-        public override string ToString() => creatureTemplate.name + " " + ID + " (" + place + ")";
+        public override string ToString() => creatureTemplate.name + " " + ID + " at " + pos + " (" + place + ")";
     }
 
     /// <summary>
-    /// Creates and removes realized creatures. Species ports implement it; the <see cref="World"/>
-    /// decides when and where.
+    /// The offscreen side of a creature's AI, ported from the game's <c>AbstractCreatureAI</c>. So far
+    /// only its destination, its node path and the link to the realized AI.
     /// </summary>
-    public interface ICreatureRealizer
+    public class AbstractCreatureAI
     {
-        /// <summary>
-        /// Realizes <paramref name="creature"/> at <paramref name="tile"/> on a room edge, coming in along
-        /// <paramref name="inward"/>. Returns false when the species can't be realized (not ported yet),
-        /// which leaves it offscreen.
-        /// </summary>
-        bool Realize(AbstractCreature creature, Room room, IntVector2 tile, IntVector2 inward);
+        public AbstractCreatureAI(World world, AbstractCreature parent)
+        {
+            this.world = world;
+            this.parent = parent;
+            destination = parent.pos;
+        }
 
-        /// <summary>
-        /// Realizes a creature that never travels (a Pole Plant or Monster Kelp) somewhere in
-        /// <paramref name="room"/> of the realizer's choosing. Returns false when there is no place for it.
-        /// </summary>
-        bool RealizePlaced(AbstractCreature creature, Room room);
-
-        /// <summary>Removes the realized body; the creature is abstract again.</summary>
-        void Abstractize(AbstractCreature creature);
+        public World world;
+        public readonly AbstractCreature parent;
+        public WorldCoordinate destination;
+        /// <summary>The nodes the creature plans to pass through offscreen.</summary>
+        public readonly List<WorldCoordinate> path = new List<WorldCoordinate>();
+        /// <summary>The realized AI, while the creature is in a room.</summary>
+        public ArtificialIntelligence RealAI;
     }
 }

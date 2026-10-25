@@ -1,351 +1,117 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace RWDE.Sim
 {
     /// <summary>
-    /// The abstract world around the desktop: the offscreen population of <see cref="AbstractCreature"/>s
-    /// spawned from the region's <see cref="SpawnTable"/>, and their arrivals into and departures from
-    /// the desktop rooms through screen-edge and sky exits. Mirrors the parts of the game's <c>World</c>,
-    /// <c>WorldLoader.GeneratePopulation</c>, <c>AbstractCreature</c> and <c>AbstractCreatureAI</c> that
-    /// move creatures between dens, the offscreen world and a room.
+    /// The rooms of the desktop and how they connect, ported from the parts of the game's <c>World</c>
+    /// that pathfinding uses. Each monitor is a room; pipes between monitors join their exit nodes.
     /// </summary>
     /// <remarks>
-    /// The desktop has no other rooms, so the rest of the region collapses into one offscreen space,
-    /// like the game's offscreen den: every spawn waits in its den there, roams, and its next room is
-    /// always a desktop room. Every random choice comes from one <see cref="random"/>, seeded from config,
-    /// so a run can be replayed.
+    /// The game's world file names which room each exit leads to. On the desktop a pipe between two
+    /// monitor rooms is reported as one room-exit <see cref="Pipe"/> in each room, both with the same
+    /// <see cref="Pipe.RoomLink"/>, and the world pairs them up whenever pipes change. As in the game,
+    /// <see cref="AbstractRoom.ExitIndex"/> finds one exit per neighbouring room, so a second pipe
+    /// between the same two rooms is entered from the far side through the first one's exit.
     /// </remarks>
     public sealed partial class World
     {
-        /// <summary>
-        /// Travel distance from the offscreen world to a room's exit. The game's offscreen den nodes have
-        /// connectivity 1 to everything and <c>World.RegionTransportationDistanceBetweenNodes</c> returns 1
-        /// for the offscreen den.
-        /// </summary>
-        private const int OffscreenTravelDistance = 1;
+        private readonly AbstractRoom[] abstractRooms;
 
-        /// <summary>
-        /// <c>AbstractRoom.CreatureAttractionToFloat(Neutral)</c>: the offscreen world has no room
-        /// attractions, so every creature finds it neutral.
-        /// </summary>
-        private const float OffscreenAttraction = 0.5f;
-
-        /// <summary>Creatures stay in their dens this close to the rain, in ticks (<c>WantToStayInDenUntilEndOfCycle</c>, story value 60 s).</summary>
-        private const int StayInDenBeforeRain = 60 * 40;
-
-        private readonly StaticWorld staticWorld;
-        private readonly List<Room> rooms = new List<Room>();
-        private readonly List<AbstractCreature> creatures = new List<AbstractCreature>();
-        private readonly Dictionary<string, int> lineageCounters = new Dictionary<string, int>();
-        private SpawnTable table;
-        private int nextID;
-        private int[] swarmRoomFlies = new int[0];
-
-        public World(StaticWorld staticWorld, SpawnTable table, int seed)
+        /// <param name="seed">Seeds <see cref="random"/>, the world's one source of randomness.</param>
+        /// <param name="rooms">The rooms, which get indices 0, 1, ... in this order.</param>
+        public World(int seed, params Room[] rooms)
         {
-            this.staticWorld = staticWorld ?? throw new ArgumentNullException(nameof(staticWorld));
-            this.table = table ?? throw new ArgumentNullException(nameof(table));
+            if (rooms == null || rooms.Length == 0)
+                throw new ArgumentException("A world needs at least one room.", nameof(rooms));
             random = new Random(seed);
+            abstractRooms = new AbstractRoom[rooms.Length];
+            for (int i = 0; i < rooms.Length; i++)
+            {
+                var abstractRoom = rooms[i].abstractRoom;
+                if (abstractRoom.world != null)
+                    throw new ArgumentException("Room " + i + " is already in a world.", nameof(rooms));
+                abstractRoom.world = this;
+                abstractRoom.index = firstRoomIndex + i;
+                abstractRooms[i] = abstractRoom;
+            }
+            ConnectRooms();
         }
 
-        /// <summary>
-        /// A world for <paramref name="campaignSetting"/> (one campaign's timeline value, or
-        /// <see cref="Campaign.AllOutskirtsCreatures"/>), with its population generated.
-        /// </summary>
-        /// <param name="campaigns">The campaigns "All Outskirts creatures" merges; default every campaign.</param>
-        public static World Create(StaticWorld staticWorld, RegionSpawnData data, string campaignSetting, int seed,
-            IEnumerable<Campaign> campaigns = null)
-        {
-            var world = new World(staticWorld, new SpawnTable(data.RegionName, new Campaign[0]), seed);
-            world.table = data.BuildTable(campaignSetting, campaigns, world.random);
-            world.GeneratePopulation();
-            return world;
-        }
-
-        /// <summary>The world's only source of randomness.</summary>
+        /// <summary>The world's seeded randomness, standing in for the game's <c>UnityEngine.Random</c>.</summary>
         public readonly Random random;
 
-        /// <summary>Creates and removes realized bodies. Without one, nothing enters a room.</summary>
-        public ICreatureRealizer realizer;
+        /// <summary>Shares the pathfinders' work per tick (<c>RainWorldGame.pathfinderResourceDivider</c>).</summary>
+        public readonly PathfinderResourceDivider pathfinderResourceDivider = new PathfinderResourceDivider();
 
-        /// <summary>Most creatures in the desktop rooms at once; arrivals wait offscreen beyond it.</summary>
-        public int populationCap = int.MaxValue;
-
-        /// <summary>Ticks until the rain (<c>RainCycle.TimeUntilRain</c>); set by the rain cycle.</summary>
-        public int timeUntilRain = int.MaxValue;
-
-        /// <summary>The pre-cycle is running (<c>RainCycle.maxPreTimer &gt; 0</c>); <c>{PreCycle}</c> creatures only come out then.</summary>
-        public bool preCycleActive;
-
-        /// <summary>It is night (<c>RainCycle.dayNightCounter &gt; 600</c>); <c>{Night}</c> creatures only come out then.</summary>
-        public bool nightActive;
-
-        public SpawnTable SpawnTable => table;
-        public IReadOnlyList<Room> Rooms => rooms;
-        public IReadOnlyList<AbstractCreature> Creatures => creatures;
-
-        /// <summary>Batflies counted offscreen in each swarm room (<see cref="SpawnTable.SwarmRooms"/> order).</summary>
-        public IReadOnlyList<int> SwarmRoomFlies => swarmRoomFlies;
-
-        /// <summary>Batflies from the <c>CREATURES</c> block, counted offscreen in their dens.</summary>
-        public int DenFlies { get; private set; }
-
-        public IEnumerable<AbstractCreature> CreaturesInRooms => creatures.Where(c => c.place == AbstractCreature.Place.InRoom);
-
-        public void AddRoom(Room room)
-        {
-            if (room == null) throw new ArgumentNullException(nameof(room));
-            if (!rooms.Contains(room)) rooms.Add(room);
-        }
-
-        /// <summary>Removes a room (a monitor went away). Creatures in it, or on their way to it, go offscreen.</summary>
-        public void RemoveRoom(Room room)
-        {
-            if (!rooms.Remove(room)) return;
-            foreach (var c in creatures)
-            {
-                if (c.room != room) continue;
-                if (c.place == AbstractCreature.Place.InRoom) realizer?.Abstractize(c);
-                if (c.place == AbstractCreature.Place.InRoom || c.place == AbstractCreature.Place.Travelling) GoOffscreen(c, c.exit);
-            }
-        }
-
-        /// <summary>Switches the spawn table (e.g. a new campaign setting); it applies from the next <see cref="GeneratePopulation"/>.</summary>
-        public void SetSpawnTable(SpawnTable newTable) => table = newTable ?? throw new ArgumentNullException(nameof(newTable));
-
-        /// <summary>The lineage counter for <paramref name="lineage"/> (the game keeps it in the save's <c>RegionState</c>).</summary>
-        public int LineageCounter(Lineage lineage) => lineageCounters.TryGetValue(lineage.denString, out int n) ? n : 0;
+        public int firstRoomIndex => 0;
+        public int NumberOfRooms => abstractRooms.Length;
 
         /// <summary>
-        /// Port of <c>WorldLoader.GeneratePopulation</c> with fresh spawns, plus the swarm rooms' batflies
-        /// (<c>FliesWorldAI</c> constructor). Offscreen creatures are replaced; creatures in a room stay.
-        /// Types whose template doesn't exist (their DLC is off) are left out.
+        /// Goes up whenever anything the node graph depends on changes: any room's nodes or connections, or
+        /// its terrain (which sets what walking between its nodes costs). Pathfinders then rebuild their node cells.
         /// </summary>
-        public void GeneratePopulation()
+        public int NodeGraphVersion { get; private set; }
+
+        // Called by a room in this world after diffs changed its terrain but not its pipes.
+        internal void NodeCostsChanged() => NodeGraphVersion++;
+
+        public AbstractRoom GetAbstractRoom(int room) =>
+            room >= firstRoomIndex && room < firstRoomIndex + abstractRooms.Length ? abstractRooms[room - firstRoomIndex] : null;
+
+        public AbstractRoom GetAbstractRoom(WorldCoordinate coord) => GetAbstractRoom(coord.room);
+
+        public AbstractRoomNode GetNode(WorldCoordinate coord)
         {
-            creatures.RemoveAll(c => c.place != AbstractCreature.Place.InRoom);
-            DenFlies = 0;
-
-            foreach (var spawner in table.Spawners)
-            {
-                if (spawner is SimpleSpawner simple)
-                {
-                    var template = staticWorld.GetCreatureTemplate(simple.creatureType);
-                    if (template == null || simple.amount <= 0) continue;
-                    if (template.quantified)
-                    {
-                        // AbstractRoom.AddQuantifiedCreature: counted, not simulated.
-                        DenFlies += simple.amount;
-                        continue;
-                    }
-                    for (int i = 0; i < simple.amount; i++)
-                        Spawn(template, simple, simple.spawnDataString);
-                }
-                else if (spawner is Lineage lineage)
-                {
-                    lineageCounters.TryGetValue(lineage.denString, out int counter);
-                    var type = lineage.CurrentType(counter);
-                    if (type == null)
-                    {
-                        // A NONE step rolls to move on; the den stays empty this cycle.
-                        lineageCounters[lineage.denString] = lineage.ChanceToProgress(counter, random);
-                        continue;
-                    }
-                    lineageCounters[lineage.denString] = counter;
-                    var template = staticWorld.GetCreatureTemplate(type.Value);
-                    if (template != null) Spawn(template, lineage, lineage.CurrentSpawnData(counter));
-                }
-            }
-
-            swarmRoomFlies = staticWorld.GetCreatureTemplate(CreatureTemplate.Type.Fly) == null
-                ? new int[table.SwarmRooms.Count]
-                : table.FliesPerSwarmRoom.ToArray();
+            var room = GetAbstractRoom(coord.room);
+            return room != null && coord.abstractNode >= 0 && coord.abstractNode < room.nodes.Length ? room.nodes[coord.abstractNode] : null;
         }
 
-        private void Spawn(CreatureTemplate template, CreatureSpawner spawner, string spawnData)
-        {
-            var creature = new AbstractCreature(template, new EntityID(spawner.SpawnerID, nextID++), spawner.den, spawnData);
-            // AbstractCreature constructor: a den spawn waits 1 tick in the offscreen den and 100-999
-            // ticks in a room's den; Pole Plants and Monster Kelp don't wait.
-            if (template.type == CreatureTemplate.Type.TentaclePlant || template.type == CreatureTemplate.Type.PoleMimic)
-                creature.remainInDenCounter = 0;
-            else
-                creature.remainInDenCounter = spawner.den.Offscreen ? 1 : RandomRange(100, 1000);
-            creatures.Add(creature);
-        }
-
-        /// <summary>Advances the abstract world one tick (1/40 s).</summary>
+        /// <summary>
+        /// Call once per tick, before any pathfinder updates (the game does this in <c>RainWorldGame.Update</c>).
+        /// Also moves the offscreen population (see <c>World.Population.cs</c>).
+        /// </summary>
         public void Update()
         {
-            foreach (var c in creatures.ToArray())
-            {
-                switch (c.place)
+            pathfinderResourceDivider.Update();
+            UpdatePopulation();
+        }
+
+        /// <summary>Both rooms' exit shortcut lengths added up (<c>World.TotalShortCutLengthBetweenTwoConnectedRooms</c>).</summary>
+        public int TotalShortCutLengthBetweenTwoConnectedRooms(int room1, int room2)
+        {
+            var a = GetAbstractRoom(room1);
+            var b = GetAbstractRoom(room2);
+            if (a != null && b != null && a.ExitIndex(b.index) != -1 && b.ExitIndex(a.index) != -1)
+                return a.nodes[a.ExitIndex(b.index)].shortCutLength + b.nodes[b.ExitIndex(a.index)].shortCutLength;
+            return -1;
+        }
+
+        // Points each exit node at the room holding the other half of its pipe.
+        internal void ConnectRooms()
+        {
+            var linkRooms = new Dictionary<int, List<int>>();
+            foreach (var room in abstractRooms)
+                for (int node = 0; node < room.nodes.Length; node++)
                 {
-                    case AbstractCreature.Place.InDen:
-                        InDenUpdate(c);
-                        break;
-                    case AbstractCreature.Place.Offscreen:
-                        c.timeSpentHere++;
-                        c.timeBuffer++;
-                        MigrationBehavior(c);
-                        break;
-                    case AbstractCreature.Place.Travelling:
-                        c.timeSpentHere++;
-                        c.timeBuffer++;
-                        FollowPath(c);
-                        break;
-                    case AbstractCreature.Place.InRoom:
-                        c.timeSpentHere++;
-                        break;
+                    int link = room.realizedRoom.RoomLinkOfNode(node);
+                    if (!linkRooms.TryGetValue(link, out var list)) linkRooms[link] = list = new List<int>();
+                    list.Add(room.index);
                 }
-            }
-        }
 
-        /// <summary>
-        /// A realized creature left <paramref name="exit"/>'s room through it: its body is removed and it
-        /// is abstract and offscreen again, free to come back later.
-        /// </summary>
-        public void CreatureLeftRoom(AbstractCreature creature, RoomExit exit)
-        {
-            if (creature.place != AbstractCreature.Place.InRoom)
-                throw new InvalidOperationException(creature + " is not in a room.");
-            realizer?.Abstractize(creature);
-            GoOffscreen(creature, exit);
-        }
-
-        /// <summary>Removes a creature from the world for good (killed, or cleared by a reset).</summary>
-        public void RemoveCreature(AbstractCreature creature)
-        {
-            if (creature.place == AbstractCreature.Place.InRoom) realizer?.Abstractize(creature);
-            creatures.Remove(creature);
-        }
-
-        // Port of AbstractCreature.InDenUpdate.
-        private void InDenUpdate(AbstractCreature c)
-        {
-            bool preCycleOk = !c.preCycle || preCycleActive;
-            if (!(c.remainInDenCounter > -1 && (!c.nightCreature || nightActive || c.ignoreCycle) && preCycleOk)) return;
-            if (WantToStayInDenUntilEndOfCycle(c))
+            foreach (var room in abstractRooms)
             {
-                c.remainInDenCounter = -1;
-                return;
+                var connections = AbstractRoom.Unconnected(room.nodes.Length);
+                for (int node = 0; node < connections.Length; node++)
+                    foreach (int other in linkRooms[room.realizedRoom.RoomLinkOfNode(node)])
+                        if (other != room.index)
+                        {
+                            connections[node] = other;
+                            break;
+                        }
+                room.connections = connections;
             }
-            c.remainInDenCounter--;
-            if (c.remainInDenCounter < 0)
-            {
-                c.remainInDenCounter = -1;
-                c.place = AbstractCreature.Place.Offscreen;
-                c.timeSpentHere = 0;
-            }
+            NodeGraphVersion++;
         }
-
-        // Port of AbstractCreature.WantToStayInDenUntilEndOfCycle for an unhurt creature.
-        private bool WantToStayInDenUntilEndOfCycle(AbstractCreature c)
-        {
-            if (timeUntilRain < StayInDenBeforeRain && !c.nightCreature && !c.ignoreCycle) return true;
-            if (c.preCycle && !preCycleActive) return true;
-            return false;
-        }
-
-        // Port of AbstractCreatureAI.MigrationBehavior. When the roll says "move to another room", the
-        // game picks a random or more attractive neighbour; offscreen, the only other rooms are the
-        // desktop rooms.
-        private void MigrationBehavior(AbstractCreature c)
-        {
-            var template = c.creatureTemplate;
-            if (c.timeSpentHere <= RandomRange(0, template.abstractedLaziness)) return;
-            if (!TimeInfluencedRandomRoll(template.roamBetweenRoomsChance * Mathf.Lerp(2f, 0.1f, OffscreenAttraction), 1)) return;
-            if (populationCap <= CreaturesInRooms.Count()) return;
-
-            if (Stationary(template))
-            {
-                if (rooms.Count == 0 || realizer == null) return;
-                var room = rooms[RandomRange(0, rooms.Count)];
-                if (realizer.RealizePlaced(c, room))
-                {
-                    c.place = AbstractCreature.Place.InRoom;
-                    c.room = room;
-                    c.exit = null;
-                    c.timeSpentHere = 0;
-                }
-                return;
-            }
-
-            // AbstractCreatureAI.TryToGoToRoom: a random node of a type the creature maps.
-            var exits = new List<RoomExit>();
-            foreach (var room in rooms)
-                foreach (var exit in RoomExit.FindExits(room))
-                    if (exit.EntryTiles(template).Count > 0)
-                        exits.Add(exit);
-            if (exits.Count == 0) return;
-
-            var target = exits[RandomRange(0, exits.Count)];
-            c.place = AbstractCreature.Place.Travelling;
-            c.room = target.Room;
-            c.exit = target;
-            c.timeBuffer = 0;
-        }
-
-        // Port of the timing in AbstractCreatureAI.FollowPath: a step of length d takes
-        // d / (offScreenSpeed * offscreenSpeedFac) ticks.
-        private void FollowPath(AbstractCreature c)
-        {
-            if (!rooms.Contains(c.room))
-            {
-                GoOffscreen(c, null);
-                return;
-            }
-            if (c.timeBuffer <= OffscreenTravelDistance / (c.creatureTemplate.offScreenSpeed * OffscreenSpeedFac)) return;
-            if (populationCap <= CreaturesInRooms.Count()) return;
-
-            // The terrain may have changed on the way; enter through what is left of the exit.
-            var tiles = c.exit.EntryTiles(c.creatureTemplate);
-            if (tiles.Count == 0 || realizer == null)
-            {
-                GoOffscreen(c, c.exit);
-                return;
-            }
-            var tile = tiles[RandomRange(0, tiles.Count)];
-            if (!realizer.Realize(c, c.room, tile, c.exit.Inward))
-            {
-                GoOffscreen(c, c.exit);
-                return;
-            }
-            c.place = AbstractCreature.Place.InRoom;
-            c.entryTile = tile;
-            c.timeSpentHere = 0;
-        }
-
-        private static void GoOffscreen(AbstractCreature c, RoomExit exit)
-        {
-            c.place = AbstractCreature.Place.Offscreen;
-            c.room = null;
-            c.exit = exit;
-            c.timeSpentHere = 0;
-            c.timeBuffer = 0;
-        }
-
-        /// <summary>
-        /// <c>AbstractCreatureAI.offscreenSpeedFac</c> for a creature following nobody:
-        /// <c>Lerp(0.1, 0.9, (1 - attraction)^2)</c>, with the offscreen world's neutral attraction.
-        /// </summary>
-        private static float OffscreenSpeedFac => Mathf.Lerp(0.1f, 0.9f, Mathf.Pow(1f - OffscreenAttraction, 2f));
-
-        /// <summary>Creatures that never travel offscreen and are placed in a room instead (Pole Plants, Monster Kelp).</summary>
-        private static bool Stationary(CreatureTemplate t) => t.abstractImmobile || t.offScreenSpeed <= 0f;
-
-        // AbstractCreatureAI.TimeInfluencedRandomRoll
-        private bool TimeInfluencedRandomRoll(float stat, int time)
-        {
-            for (int i = 0; i < time; i++)
-                if (random.NextDouble() < stat)
-                    return true;
-            return false;
-        }
-
-        // UnityEngine.Random.Range(int, int): max exclusive, and min when the range is empty.
-        private int RandomRange(int min, int max) => max <= min ? min : random.Next(min, max);
     }
 }
