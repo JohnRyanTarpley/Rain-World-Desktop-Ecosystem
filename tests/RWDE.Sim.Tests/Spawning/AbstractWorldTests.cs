@@ -17,15 +17,20 @@ namespace RWDE.Sim.Tests.Spawning
             public readonly List<(AbstractCreature creature, IntVector2 tile, IntVector2 inward)> Realized = new List<(AbstractCreature, IntVector2, IntVector2)>();
             public readonly List<AbstractCreature> Placed = new List<AbstractCreature>();
             public readonly List<AbstractCreature> Abstracted = new List<AbstractCreature>();
+            /// <summary>The creature's position when each Realize call was made, accepted or not.</summary>
+            public readonly List<WorldCoordinate> PosWhenRealized = new List<WorldCoordinate>();
+            public IntVector2 PlaceAt = new IntVector2(6, 1);
 
             public bool Realize(AbstractCreature creature, Room room, IntVector2 tile, IntVector2 inward)
             {
+                PosWhenRealized.Add(creature.pos);
                 if (Accept) Realized.Add((creature, tile, inward));
                 return Accept;
             }
 
-            public bool RealizePlaced(AbstractCreature creature, Room room)
+            public bool RealizePlaced(AbstractCreature creature, Room room, out IntVector2 tile)
             {
+                tile = PlaceAt;
                 if (Accept) Placed.Add(creature);
                 return Accept;
             }
@@ -307,6 +312,97 @@ namespace RWDE.Sim.Tests.Spawning
             Assert.AreNotEqual(-1, RunUntil(world, () => realizer.Placed.Count == 2));
             Assert.IsEmpty(realizer.Realized);
             Assert.IsTrue(world.Creatures.All(c => c.Realized && c.Room.realizedRoom == room && c.exit == null));
+
+            // The plant is where the realizer put it, not at a coordinate with no tile.
+            foreach (var plant in world.Creatures)
+            {
+                Assert.AreEqual(room.GetWorldCoordinate(realizer.PlaceAt), plant.pos);
+                Assert.AreEqual(plant.pos, plant.abstractAI.destination);
+            }
+        }
+
+        [Test]
+        public void ACreatureIsInItsRoomBeforeItIsRealized()
+        {
+            // A realizer that builds the creature's AI reads its position, so it must be the entry tile.
+            var (world, realizer, room) = Setup(3, "OFFSCREEN : 0-Green");
+            RunUntil(world, () => realizer.Realized.Count == 1);
+            var (lizard, tile, _) = realizer.Realized.Single();
+
+            Assert.AreEqual(room.GetWorldCoordinate(tile), realizer.PosWhenRealized.Single());
+            Assert.AreEqual(lizard.pos, lizard.abstractAI.destination);
+
+            // Refused, it goes back offscreen.
+            var (refused, refuser, _) = Setup(3, "OFFSCREEN : 0-Green");
+            refuser.Accept = false;
+            RunUntil(refused, () => refuser.PosWhenRealized.Count == 1);
+            refused.Update();
+            var green = refused.Creatures.Single();
+            Assert.AreNotEqual(AbstractCreature.OffscreenPos, refuser.PosWhenRealized.Single());
+            Assert.AreEqual(AbstractCreature.OffscreenPos, green.pos);
+            Assert.AreEqual(AbstractCreature.OffscreenPos, green.abstractAI.destination);
+        }
+
+        [Test]
+        public void InfantCentipedesComeOutOfTheirDenIntoTheRoom()
+        {
+            // Their template never roams between rooms, so the generic roam roll would hold them offscreen for good.
+            var (world, realizer, _) = Setup(2, "YY_A02 : 4-Small Centipede-3");
+            Assert.That(All.GetCreatureTemplate(Type.SmallCentipede).roamBetweenRoomsChance, Is.LessThan(0f));
+
+            Assert.AreNotEqual(-1, RunUntil(world, () => realizer.Realized.Count == 3, 3000));
+
+            // One that leaves doesn't wander back in.
+            var centipede = world.Creatures.First();
+            world.CreatureLeftRoom(centipede, centipede.exit);
+            for (int t = 0; t < 20000; t++) world.Update();
+            Assert.AreEqual(AbstractCreature.Place.Offscreen, centipede.place);
+            Assert.AreEqual(3, realizer.Realized.Count);
+        }
+
+        [Test]
+        public void ScavengersComeInOnTheirOwnMigrationTimer()
+        {
+            var (world, realizer, _) = Setup(4, "OFFSCREEN : 0-Scavenger-3");
+            Assert.That(All.GetCreatureTemplate(Type.Scavenger).roamBetweenRoomsChance, Is.LessThan(0f));
+            foreach (var scav in world.Creatures)
+                Assert.That(scav.dontMigrate, Is.InRange(400, 4799), "ScavengerAbstractAI: Random.Range(400, 4800)");
+
+            int first = RunUntil(world, () => realizer.Realized.Count > 0, 60000);
+            Assert.That(first, Is.GreaterThanOrEqualTo(400), "no scavenger sets off before its dontMigrate runs out");
+            Assert.AreNotEqual(-1, RunUntil(world, () => realizer.Realized.Count == 3, 60000));
+        }
+
+        [Test]
+        public void PersonalityComesFromTheID()
+        {
+            var a = new AbstractCreature.Personality(new EntityID(0, 7));
+            var b = new AbstractCreature.Personality(new EntityID(3, 7));
+            var c = new AbstractCreature.Personality(new EntityID(0, 8));
+
+            Assert.AreEqual(a, b, "the game seeds it from the ID's number");
+            Assert.AreNotEqual(a, c);
+            foreach (var p in new[] { a, c })
+                foreach (var trait in new[] { p.energy, p.bravery, p.sympathy, p.dominance, p.nervous, p.aggression })
+                    Assert.That(trait, Is.InRange(0f, 1f));
+        }
+
+        [Test]
+        public void SwitchingTablesStartsLineagesOver()
+        {
+            // White's lineage in the den has moved on to step 1; Red's lineage in the same den has only step 0.
+            var data = new RegionSpawnData("yy", new[]
+            {
+                "ROOMS", "YY_A01 : YY_A02", "YY_A02 : YY_A01", "END ROOMS", "CREATURES",
+                "(White)LINEAGE : YY_A02 : 2 : NONE-1, EggBug-0", "(Red)LINEAGE : YY_A02 : 2 : Red-0", "END CREATURES"
+            });
+            var world = World.Create(All, data, "White", 1, null, DesktopRoom());
+            Assert.AreEqual(1, world.LineageCounter((World.Lineage)world.SpawnTable.Spawners[0]));
+
+            world.SetSpawnTable(data.BuildTable("Red"));
+            world.GeneratePopulation();
+
+            Assert.AreEqual(Type.RedLizard, world.Creatures.Single().creatureTemplate.type);
         }
 
         [Test]

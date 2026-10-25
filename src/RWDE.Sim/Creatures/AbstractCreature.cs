@@ -26,12 +26,46 @@ namespace RWDE.Sim
         /// <summary>Nowhere in the world's rooms: offscreen.</summary>
         public static readonly WorldCoordinate OffscreenPos = new WorldCoordinate(-1, -1, -1, -1);
 
+        /// <summary>
+        /// The game's <c>AbstractCreature.Personality</c>: traits drawn from the creature's ID, so the same
+        /// ID always gives the same creature. Same formula as the game, but drawn from a
+        /// <see cref="System.Random"/> seeded with the ID rather than Unity's generator.
+        /// </summary>
+        public readonly struct Personality
+        {
+            public readonly float energy;
+            public readonly float bravery;
+            public readonly float sympathy;
+            public readonly float dominance;
+            public readonly float nervous;
+            public readonly float aggression;
+
+            public Personality(EntityID ID)
+            {
+                // EntityID.RandomSeed is the number unless an alternative seed was set; the desktop never sets one.
+                var random = new System.Random(ID.number);
+                float Value() => (float)random.NextDouble();
+                sympathy = Value();
+                energy = Value();
+                bravery = Value();
+                sympathy = Custom.PushFromHalf(sympathy, 1.5f);
+                energy = Custom.PushFromHalf(energy, 1.5f);
+                bravery = Custom.PushFromHalf(bravery, 1.5f);
+                nervous = Mathf.Lerp(Value(), Mathf.Lerp(energy, 1f - bravery, 0.5f), Mathf.Pow(Value(), 0.25f));
+                aggression = Mathf.Lerp(Value(), (energy + bravery) / 2f * (1f - sympathy), Mathf.Pow(Value(), 0.25f));
+                dominance = Mathf.Lerp(Value(), (energy + bravery + aggression) / 3f, Mathf.Pow(Value(), 0.25f));
+                nervous = Custom.PushFromHalf(nervous, 2.5f);
+                aggression = Custom.PushFromHalf(aggression, 2.5f);
+            }
+        }
+
         public AbstractCreature(World world, CreatureTemplate creatureTemplate, WorldCoordinate pos)
         {
             this.world = world;
             this.creatureTemplate = creatureTemplate;
             this.pos = pos;
             abstractAI = new AbstractCreatureAI(world, this);
+            personality = new Personality(ID);
         }
 
         /// <remarks>
@@ -42,6 +76,7 @@ namespace RWDE.Sim
             : this(world, creatureTemplate, OffscreenPos)
         {
             ID = id;
+            personality = new Personality(id);
             this.spawnDen = spawnDen;
             this.spawnData = spawnData;
             place = Place.InDen;
@@ -55,6 +90,7 @@ namespace RWDE.Sim
         public AbstractCreatureAI abstractAI;
 
         public readonly EntityID ID = new EntityID(-1, -1);
+        public Personality personality;
         /// <summary>The den it was spawned in (<c>spawnDen</c>).</summary>
         public readonly World.Den spawnDen = new World.Den(null, -1);
         /// <summary>The spawner's <c>{...}</c> attribute group, or null.</summary>
@@ -73,6 +109,8 @@ namespace RWDE.Sim
         public int timeSpentHere;
         /// <summary>Ticks banked toward offscreen travel (<c>AbstractCreatureAI.timeBuffer</c>).</summary>
         public int timeBuffer;
+        /// <summary>A scavenger's ticks before it may set off for another room (<c>ScavengerAbstractAI.dontMigrate</c>).</summary>
+        public int dontMigrate;
 
         // Flags from the spawn data (setCustomFlags).
         public bool nightCreature;

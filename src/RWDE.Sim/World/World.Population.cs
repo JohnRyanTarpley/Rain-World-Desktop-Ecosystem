@@ -94,8 +94,17 @@ namespace RWDE.Sim
 
         public IEnumerable<AbstractCreature> CreaturesInRooms => creatures.Where(c => c.place == AbstractCreature.Place.InRoom);
 
-        /// <summary>Switches the spawn table (e.g. a new campaign setting); it applies from the next <see cref="GeneratePopulation"/>.</summary>
-        public void SetSpawnTable(SpawnTable newTable) => table = newTable ?? throw new ArgumentNullException(nameof(newTable));
+        /// <summary>
+        /// Switches the spawn table (e.g. a new campaign setting); it applies from the next <see cref="GeneratePopulation"/>.
+        /// Lineage counters start over: they are keyed by den, so the old table's progress could point past
+        /// the end of a different lineage in the same den. The game keeps them per save, and each campaign
+        /// has its own save.
+        /// </summary>
+        public void SetSpawnTable(SpawnTable newTable)
+        {
+            table = newTable ?? throw new ArgumentNullException(nameof(newTable));
+            lineageCounters.Clear();
+        }
 
         /// <summary>The lineage counter for <paramref name="lineage"/> (the game keeps it in the save's <c>RegionState</c>).</summary>
         public int LineageCounter(Lineage lineage) => lineageCounters.TryGetValue(lineage.denString, out int n) ? n : 0;
@@ -157,6 +166,9 @@ namespace RWDE.Sim
                 creature.remainInDenCounter = 0;
             else
                 creature.remainInDenCounter = spawner.den.Offscreen ? 1 : RandomRange(100, 1000);
+            // ScavengerAbstractAI constructor
+            if (template.type == CreatureTemplate.Type.Scavenger)
+                creature.dontMigrate = RandomRange(400, 4800);
             creatures.Add(creature);
         }
 
@@ -200,6 +212,10 @@ namespace RWDE.Sim
         }
 
         /// <summary>Removes a creature from the world for good (killed, or cleared by a reset).</summary>
+        /// <remarks>
+        /// A kill doesn't move a lineage on: the game only rolls <c>ChanceToProgress</c> when the player
+        /// kills a lineage creature (<c>SaveState.AddCreatureToRespawn</c>), and no one plays on the desktop.
+        /// </remarks>
         public void RemoveCreature(AbstractCreature creature)
         {
             if (creature.place == AbstractCreature.Place.InRoom) realizer?.Abstractize(creature);
@@ -239,18 +255,18 @@ namespace RWDE.Sim
         private void MigrationBehavior(AbstractCreature c)
         {
             var template = c.creatureTemplate;
-            if (c.timeSpentHere <= RandomRange(0, template.abstractedLaziness)) return;
-            if (!TimeInfluencedRandomRoll(template.roamBetweenRoomsChance * Mathf.Lerp(2f, 0.1f, OffscreenAttraction), 1)) return;
+            if (!WantsToMigrate(c)) return;
             if (populationCap <= CreaturesInRooms.Count()) return;
 
             if (Stationary(template))
             {
                 if (realizer == null) return;
                 var room = abstractRooms[RandomRange(0, abstractRooms.Length)].realizedRoom;
-                if (realizer.RealizePlaced(c, room))
+                if (realizer.RealizePlaced(c, room, out var tile))
                 {
                     c.place = AbstractCreature.Place.InRoom;
-                    c.pos = new WorldCoordinate(room.abstractRoom.index, -1, -1, -1);
+                    c.pos = new WorldCoordinate(room.abstractRoom.index, tile.x, tile.y, -1);
+                    c.abstractAI.destination = c.pos;
                     c.exit = null;
                     c.timeSpentHere = 0;
                 }
@@ -272,6 +288,35 @@ namespace RWDE.Sim
             c.timeBuffer = 0;
         }
 
+        // Whether an offscreen creature sets off for a desktop room this tick.
+        private bool WantsToMigrate(AbstractCreature c)
+        {
+            var template = c.creatureTemplate;
+            if (template.type == CreatureTemplate.Type.Scavenger) return ScavengerWantsToMigrate(c);
+
+            // Creatures that never roam between rooms (Infant Centipedes) come out of their den into
+            // their own room in the game. The desktop room stands in for it, so they come straight in
+            // from the den. One that has been in a room and left (the rain, or blocked terrain) stays
+            // offscreen until the next population, as it would never wander back in the game.
+            if (template.roamBetweenRoomsChance < 0f && !Stationary(template))
+                return c.exit == null;
+
+            if (c.timeSpentHere <= RandomRange(0, template.abstractedLaziness)) return false;
+            return TimeInfluencedRandomRoll(template.roamBetweenRoomsChance * Mathf.Lerp(2f, 0.1f, OffscreenAttraction), 1);
+        }
+
+        // ScavengerAbstractAI.AbstractBehavior's migration roll for a scavenger without a squad: it stays
+        // put for dontMigrate ticks, then rolls 0.1 / Lerp(100, 2, bravery * energy) each tick. A lone
+        // scavenger's Migrate heads home in the game and only squads roam; squads (ScavengersWorldAI)
+        // aren't ported and offscreen is already home, so here the roll takes it to a desktop room.
+        private bool ScavengerWantsToMigrate(AbstractCreature c)
+        {
+            if (c.dontMigrate > 0) c.dontMigrate--;
+            if (c.dontMigrate >= 1) return false;
+            float roaming = c.personality.bravery * c.personality.energy;
+            return TimeInfluencedRandomRoll(0.1f / Mathf.Lerp(100f, 2f, roaming), 1);
+        }
+
         // Port of the timing in AbstractCreatureAI.FollowPath: a step of length d takes
         // d / (offScreenSpeed * offscreenSpeedFac) ticks.
         private void FollowPath(AbstractCreature c)
@@ -288,14 +333,15 @@ namespace RWDE.Sim
                 return;
             }
             var tile = tiles[RandomRange(0, tiles.Count)];
+            // In the game a creature is in its room before it is realized, so its AI starts from there.
+            c.pos = new WorldCoordinate(room.abstractRoom.index, tile.x, tile.y, -1);
+            c.abstractAI.destination = c.pos;
             if (!realizer.Realize(c, room, tile, c.exit.Inward))
             {
                 GoOffscreen(c, c.exit);
                 return;
             }
             c.place = AbstractCreature.Place.InRoom;
-            c.pos = new WorldCoordinate(room.abstractRoom.index, tile.x, tile.y, -1);
-            c.abstractAI.destination = c.pos;
             c.entryTile = tile;
             c.timeSpentHere = 0;
         }
