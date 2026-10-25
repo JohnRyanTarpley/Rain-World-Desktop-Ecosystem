@@ -356,13 +356,27 @@ namespace RWDE.Sim
             if (world.NodeGraphVersion != seenNodeGraphVersion)
             {
                 SetUpWorld();
-                // A node that went with its pipe: head for the tile, or let the node be worked out again.
-                if (destination.room != room && destination.NodeDefined
-                    && destination.abstractNode >= world.GetAbstractRoom(destination).nodes.Length)
-                    destination.abstractNode = -1;
-                if (nextDestination.HasValue && nextDestination.Value.room != room && nextDestination.Value.NodeDefined
-                    && nextDestination.Value.abstractNode >= world.GetAbstractRoom(nextDestination.Value).nodes.Length)
-                    nextDestination = null;
+                // Node numbers follow the room's exits in scan order, so a pipe added or removed anywhere in
+                // that room can give a remote destination's node to a different exit. A destination with a
+                // tile has its node worked out again, as SetDestination does; one without loses a node that
+                // went with its pipe.
+                if (destination.room != room && destination.NodeDefined)
+                {
+                    if (destination.TileDefined)
+                        destination = QuickConnectivity.DefineNodeOfLocalCoordinate(
+                            new WorldCoordinate(destination.room, destination.x, destination.y, -1), world, creatureType);
+                    else if (destination.abstractNode >= world.GetAbstractRoom(destination).nodes.Length)
+                        destination.abstractNode = -1;
+                }
+                if (nextDestination.HasValue && nextDestination.Value.room != room && nextDestination.Value.NodeDefined)
+                {
+                    var next = nextDestination.Value;
+                    if (next.TileDefined)
+                        nextDestination = QuickConnectivity.DefineNodeOfLocalCoordinate(
+                            new WorldCoordinate(next.room, next.x, next.y, -1), world, creatureType);
+                    else if (next.abstractNode >= world.GetAbstractRoom(next).nodes.Length)
+                        nextDestination = null;
+                }
             }
             Reset(realizedRoom);
         }
