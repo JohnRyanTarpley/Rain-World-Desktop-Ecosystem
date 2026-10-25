@@ -43,6 +43,18 @@ namespace RWDE.Sim
         public static bool DistLess(Vector2 a, Vector2 b, float dist) => (a - b).magnitude < dist;
         public static bool DistLess(IntVector2 a, IntVector2 b, float dist) => DistLess(a.ToVector2(), b.ToVector2(), dist);
 
+        // Custom.LerpMap with an exponent on the mapped fraction.
+        public static float LerpMap(float val, float fromA, float toA, float fromB, float toB, float exponent) =>
+            fromB + (toB - fromB) * Mathf.Pow(Mathf.InverseLerp(fromA, toA, val), exponent);
+
+        // Custom.PushFromHalf: pushes a 0-1 value away from 0.5.
+        public static float PushFromHalf(float val, float pushExponent)
+        {
+            if (val == 0.5f) return 0.5f;
+            if (val < 0.5f) return LerpMap(val, 0f, 0.5f, 0f, 0.5f, pushExponent);
+            return LerpMap(val, 1f, 0.5f, 1f, 0.5f, pushExponent);
+        }
+
         // Custom.InsideRect: edges included.
         public static bool InsideRect(IntVector2 vec, IntRect rect) => InsideRect(vec.x, vec.y, rect);
 

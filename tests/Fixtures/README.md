@@ -16,5 +16,7 @@ so no binaries are committed.
 | `steam/appmanifest_312520.acf` | Steam app manifest for the game. |
 | `world/xx/world_xx.txt` | World file: `ROOMS`, `CREATURES` and `BAT MIGRATION BLOCKAGES` sections, `//` comments, a `(A,B)` campaign filter. |
 | `modify/world/xx/world_xx.txt` | Mod `modify` file with a `[MERGE]` ... `[ENDMERGE]` block and an `[ADD]` line. |
+| `world/yy/world_yy.txt`, `world/yy/properties.txt` | Spawner region `yy`: swarm rooms, room spawns, lineages, `OFFSCREEN` spawns, `(A,B)` and `(X-A)` campaign filters, an unknown room and a non-roster creature; `batsPerActiveSwarmRoom`. |
+| `modify/moreslugcats/world/yy/world_yy.txt`, `modify/watcher/world/yy/world_yy.txt` | The two DLC `modify` files for region `yy`: a `[FINDLINESTART]` removal, campaign-filtered spawns with `{PreCycle}`/`{Night}` data, and a `HIDEROOM` conditional link. |
 | `atlases/fixtureAtlas.txt` | Futile atlas data (TexturePacker JSON hash) for a 64x32 texture. |
 | `desktop/*.json` | Desktop layouts for the terrain rasteriser: `screen`, `taskbar` (or null) and `icons`, each rectangle `[left, top, right, bottom]` in virtual-screen pixels. |

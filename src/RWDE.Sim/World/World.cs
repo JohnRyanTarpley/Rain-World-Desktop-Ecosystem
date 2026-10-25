@@ -14,7 +14,7 @@ namespace RWDE.Sim
     /// <see cref="AbstractRoom.ExitIndex"/> finds one exit per neighbouring room, so a second pipe
     /// between the same two rooms is entered from the far side through the first one's exit.
     /// </remarks>
-    public sealed class World
+    public sealed partial class World
     {
         private readonly AbstractRoom[] abstractRooms;
 
@@ -67,8 +67,15 @@ namespace RWDE.Sim
             return room != null && coord.abstractNode >= 0 && coord.abstractNode < room.nodes.Length ? room.nodes[coord.abstractNode] : null;
         }
 
-        /// <summary>Call once per tick, before any pathfinder updates (the game does this in <c>RainWorldGame.Update</c>).</summary>
-        public void Update() => pathfinderResourceDivider.Update();
+        /// <summary>
+        /// Call once per tick, before any pathfinder updates (the game does this in <c>RainWorldGame.Update</c>).
+        /// Also moves the offscreen population (see <c>World.Population.cs</c>).
+        /// </summary>
+        public void Update()
+        {
+            pathfinderResourceDivider.Update();
+            UpdatePopulation();
+        }
 
         /// <summary>Both rooms' exit shortcut lengths added up (<c>World.TotalShortCutLengthBetweenTwoConnectedRooms</c>).</summary>
         public int TotalShortCutLengthBetweenTwoConnectedRooms(int room1, int room2)

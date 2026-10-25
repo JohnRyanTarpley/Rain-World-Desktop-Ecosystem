@@ -387,7 +387,7 @@ namespace RWDE.Sim
         }
 
         // CreatureTemplate constructor names, plus MoreSlugcatsCreatures.CreatureName for Downpour's.
-        private static string NameOf(Type type)
+        internal static string NameOf(Type type)
         {
             switch (type)
             {

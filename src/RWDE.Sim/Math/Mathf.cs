@@ -20,5 +20,10 @@ namespace RWDE.Sim
         public static float Clamp01(float value) => Clamp(value, 0f, 1f);
 
         public static float InverseLerp(float a, float b, float value) => a != b ? Clamp01((value - a) / (b - a)) : 0f;
+
+        /// <summary>Interpolates from <paramref name="a"/> to <paramref name="b"/>, with <paramref name="t"/> clamped to [0, 1].</summary>
+        public static float Lerp(float a, float b, float t) => a + (b - a) * Clamp01(t);
+
+        public static float Pow(float f, float p) => (float)Math.Pow(f, p);
     }
 }

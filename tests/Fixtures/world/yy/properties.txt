@@ -1,0 +1,3 @@
+Palette: 0
+batsPerActiveSwarmRoom: 5
+Subregion: Invented Fields
