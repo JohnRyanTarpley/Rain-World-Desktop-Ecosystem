@@ -38,10 +38,13 @@ namespace RWDE.GameAssets.Cache
         /// <summary>True if the last call to <see cref="EnsureExtracted"/> extracted (rather than reused the cache).</summary>
         public bool ExtractedThisRun { get; private set; }
 
-        /// <summary>Extracts the packed atlases unless the cache already matches this install.</summary>
-        public void EnsureExtracted(RainWorldInstall install)
+        /// <summary>
+        /// Extracts the packed atlases unless the cache already matches this install. Atlases of a DLC
+        /// that isn't installed are left out (see <see cref="DlcDetector.IsPackedAtlasAvailable"/>).
+        /// </summary>
+        public void EnsureExtracted(RainWorldInstall install, Dlc installedDlc)
         {
-            var stamp = BuildStamp(install);
+            var stamp = BuildStamp(install, installedDlc);
             ExtractedThisRun = false;
             if (File.Exists(StampPath) && File.ReadAllText(StampPath) == stamp && Directory.Exists(AtlasDirectory))
             {
@@ -52,7 +55,8 @@ namespace RWDE.GameAssets.Cache
             if (File.Exists(StampPath)) File.Delete(StampPath);
             if (Directory.Exists(AtlasDirectory)) Directory.Delete(AtlasDirectory, recursive: true);
 
-            var report = AtlasExtractor.Extract(install.ResourcesAssetsPath, AtlasDirectory);
+            var report = AtlasExtractor.Extract(install.ResourcesAssetsPath, AtlasDirectory,
+                name => DlcDetector.IsPackedAtlasAvailable(name, installedDlc));
             SkippedAtlases = report.Skipped;
             ExtractedThisRun = true;
             // Written last: an interrupted extraction leaves no stamp and is redone next launch.
@@ -72,7 +76,7 @@ namespace RWDE.GameAssets.Cache
             return atlases;
         }
 
-        internal static string BuildStamp(RainWorldInstall install)
+        internal static string BuildStamp(RainWorldInstall install, Dlc installedDlc)
         {
             var assets = new FileInfo(install.ResourcesAssetsPath);
             return string.Join("\n",
@@ -80,6 +84,7 @@ namespace RWDE.GameAssets.Cache
                 "gameVersion=" + install.GameVersion,
                 "resourcesSize=" + assets.Length.ToString(CultureInfo.InvariantCulture),
                 "resourcesModifiedUtc=" + assets.LastWriteTimeUtc.Ticks.ToString(CultureInfo.InvariantCulture),
+                "dlc=" + installedDlc,
                 "");
         }
     }
