@@ -75,7 +75,9 @@ namespace RWDE.Shell.Terrain
                 pairs.Add((a, right));
             }
 
-            // Chain pairs whose icons stack under each other into runs, top down.
+            // Chain pairs whose icons stack under each other into runs, top down. Each pair must touch
+            // the one above it and line up with the run's first pair, so jitter can't add up row by row
+            // into a diagonal staircase.
             pairs.Sort((p, q) => p.left.Top.CompareTo(q.left.Top));
             var used = new bool[pairs.Count];
             for (int i = 0; i < pairs.Count; i++)
@@ -83,10 +85,12 @@ namespace RWDE.Shell.Terrain
                 if (used[i]) continue;
                 used[i] = true;
                 var run = new List<(ScreenRect left, ScreenRect right)> { pairs[i] };
+                var first = pairs[i];
                 for (int j = i + 1; j < pairs.Count; j++)
                 {
                     var last = run[run.Count - 1];
-                    if (!used[j] && Stacked(last.left, pairs[j].left) && Stacked(last.right, pairs[j].right))
+                    if (!used[j] && Stacked(last.left, pairs[j].left) && Stacked(last.right, pairs[j].right)
+                        && Aligned(first.left, pairs[j].left) && Aligned(first.right, pairs[j].right))
                     {
                         used[j] = true;
                         run.Add(pairs[j]);
@@ -114,7 +118,11 @@ namespace RWDE.Shell.Terrain
 
         /// <summary>True when <paramref name="below"/> sits directly under <paramref name="above"/> in the same column.</summary>
         private static bool Stacked(ScreenRect above, ScreenRect below) =>
-            Touching(above.Bottom, below.Top) && Math.Abs(above.Left - below.Left) <= Jitter && Math.Abs(above.Right - below.Right) <= Jitter;
+            Touching(above.Bottom, below.Top) && Aligned(above, below);
+
+        /// <summary>True when the two icons' left and right edges agree within the jitter.</summary>
+        private static bool Aligned(ScreenRect a, ScreenRect b) =>
+            Math.Abs(a.Left - b.Left) <= Jitter && Math.Abs(a.Right - b.Right) <= Jitter;
 
         /// <summary>An edge meets the next one when they overlap by no more than the jitter and leave less than a tile between them.</summary>
         private static bool Touching(int end, int start) => start - end >= -Jitter && start - end < MaxGap;

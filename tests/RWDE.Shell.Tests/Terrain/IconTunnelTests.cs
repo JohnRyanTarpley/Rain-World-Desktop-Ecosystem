@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using NUnit.Framework;
+using RWDE.Shell.Desktop;
 using RWDE.Shell.Terrain;
 using RWDE.Sim;
 
@@ -74,6 +75,26 @@ namespace RWDE.Shell.Tests.Terrain
             for (int y = 14; y <= 18; y++)
                 for (int x = 5; x <= 10; x++)
                     Assert.That(terrain[x, y], Is.EqualTo(y >= 15 && y <= 17 ? Solid : Air), "tile " + x + "," + y);
+        }
+
+        [Test]
+        public void JitterDoesNotAddUpAlongAStaircase()
+        {
+            // Fourteen rows of two 60 px icons, each row 10 px (the jitter) right of the one above. Next
+            // to each other the rows line up, but the bottom row sits 130 px right of the top one, so
+            // they can't be one column: only rows within the jitter of a run's first row join it.
+            var icons = new List<ScreenRect>();
+            for (int row = 0; row < 14; row++)
+            {
+                int dx = 10 * row, y = 20 + 60 * row;
+                icons.Add(new ScreenRect(100 + dx, y, 160 + dx, y + 60));
+                icons.Add(new ScreenRect(160 + dx, y, 220 + dx, y + 60));
+            }
+
+            var expected = new List<IconTunnel>();
+            for (int run = 0; run < 7; run++)
+                expected.Add(new IconTunnel(165 + 20 * run, 20 + 120 * run, 140 + 120 * run, 2));
+            Assert.That(IconTunnelDetector.Detect(icons), Is.EqualTo(expected));
         }
 
         // These fixtures put the icon columns in tile rows 0-8 from the bottom up.
