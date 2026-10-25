@@ -98,14 +98,18 @@ namespace RWDE.Shell.Terrain
                 }
                 if (run.Count < MinRows) continue;
 
-                int seamSum = 0, top = int.MaxValue, bottom = int.MinValue;
+                // The seam is the mean of each row's midpoint, rounded once and down, so the same icons
+                // give the same seam wherever they sit, negative virtual-screen coordinates included.
+                long edgeSum = 0;
+                int top = int.MaxValue, bottom = int.MinValue;
                 foreach (var (left, right) in run)
                 {
-                    seamSum += (left.Right + right.Left) / 2;
+                    edgeSum += left.Right + right.Left;
                     top = Math.Min(top, Math.Min(left.Top, right.Top));
                     bottom = Math.Max(bottom, Math.Max(left.Bottom, right.Bottom));
                 }
-                tunnels.Add(new IconTunnel(seamSum / run.Count, top, bottom, run.Count));
+                int seamX = (int)Math.Floor(edgeSum / (2.0 * run.Count));
+                tunnels.Add(new IconTunnel(seamX, top, bottom, run.Count));
             }
 
             tunnels.Sort((p, q) => p.SeamX != q.SeamX ? p.SeamX.CompareTo(q.SeamX) : p.Top.CompareTo(q.Top));

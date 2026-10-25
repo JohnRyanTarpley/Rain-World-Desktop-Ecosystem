@@ -90,47 +90,95 @@ namespace RWDE.Shell.Terrain
             foreach (var icon in layout.Icons)
                 Fill(tiles, coords, icon);
 
-            var tunnels = new List<TunnelTiles>();
-            foreach (var tunnel in IconTunnelDetector.Detect(layout.Icons))
-                if (Carve(tiles, ground, coords, tunnel, out var carved))
-                    tunnels.Add(carved);
+            var tunnels = Carve(tiles, ground, coords, IconTunnelDetector.Detect(layout.Icons));
 
             return new RasterizedDesktop(coords, tiles, FindOpenings(tiles, coords.Width, coords.Height), tunnels);
         }
 
         /// <summary>
-        /// Clears the tile column under the tunnel's seam to Air for the height of its icons and makes
-        /// the columns either side Solid, so it is the game's one-tile crawl passage. A tunnel whose
-        /// icons reach the floor or the taskbar stops short of them. One closed end leaves a dead end,
-        /// as crawl passages can be in the game; a tunnel closed at both ends, or crossing ground,
-        /// can't be entered and stays solid.
+        /// Clears the tile column under each tunnel's seam to Air for the height of its icons and makes the
+        /// columns either side Solid, so it is the game's one-tile crawl passage. All tunnels are worked out
+        /// in tile space before any is carved:
+        /// <list type="bullet">
+        /// <item>a tunnel whose icons reach the floor or the taskbar stops short of them; one crossing
+        /// them stays solid;</item>
+        /// <item>tunnels in the same column that touch become one;</item>
+        /// <item>tunnels side by side that share a row join up there, and a wall is never built on another
+        /// tunnel's tiles;</item>
+        /// <item>a group of joined tunnels open at one end or more is carved, with any closed end left as
+        /// a dead end, as crawl passages can be in the game; a group closed at every end can't be
+        /// entered and stays solid.</item>
+        /// </list>
         /// </summary>
-        private static bool Carve(TileState[,] tiles, bool[,] ground, RoomCoordinates coords, IconTunnel tunnel, out TunnelTiles carved)
+        private static List<TunnelTiles> Carve(TileState[,] tiles, bool[,] ground, RoomCoordinates coords, List<IconTunnel> detected)
         {
-            carved = default;
-            var seam = new ScreenRect(tunnel.SeamX, tunnel.Top, tunnel.SeamX + 1, tunnel.Bottom);
-            if (!coords.TryGetTiles(seam, out var min, out var max)) return false;
+            int width = coords.Width, height = coords.Height;
 
-            int x = min.x, bottom = min.y, top = max.y;
-            while (bottom <= top && ground[x, bottom]) bottom++;
-            while (top >= bottom && ground[x, top]) top--;
-            if (bottom > top) return false;
-            for (int y = bottom; y <= top; y++)
-                if (ground[x, y]) return false;
-
-            // The top edge of the screen is sky, so a tunnel reaching it is open there.
-            bool openBelow = bottom > 0 && !IsSolid(tiles[x, bottom - 1]);
-            bool openAbove = top == coords.Height - 1 || !IsSolid(tiles[x, top + 1]);
-            if (!openBelow && !openAbove) return false;
-
-            for (int y = bottom; y <= top; y++)
+            var spans = new List<TunnelTiles>();
+            foreach (var tunnel in detected)
             {
-                tiles[x, y] = TileState.Air;
-                if (x > 0 && !ground[x - 1, y]) tiles[x - 1, y] = TileState.Solid;
-                if (x < coords.Width - 1 && !ground[x + 1, y]) tiles[x + 1, y] = TileState.Solid;
+                var seam = new ScreenRect(tunnel.SeamX, tunnel.Top, tunnel.SeamX + 1, tunnel.Bottom);
+                if (!coords.TryGetTiles(seam, out var min, out var max)) continue;
+                int x = min.x, bottom = min.y, top = max.y;
+                while (bottom <= top && ground[x, bottom]) bottom++;
+                while (top >= bottom && ground[x, top]) top--;
+                bool crossesGround = false;
+                for (int y = bottom; y <= top; y++)
+                    crossesGround |= ground[x, y];
+                if (bottom <= top && !crossesGround)
+                    spans.Add(new TunnelTiles(x, bottom, top));
             }
-            carved = new TunnelTiles(x, bottom, top);
-            return true;
+
+            // Same column and touching or overlapping: one tunnel.
+            spans.Sort((a, b) => a.X != b.X ? a.X.CompareTo(b.X) : a.Bottom.CompareTo(b.Bottom));
+            var merged = new List<TunnelTiles>();
+            foreach (var span in spans)
+            {
+                int last = merged.Count - 1;
+                if (last >= 0 && merged[last].X == span.X && span.Bottom <= merged[last].Top + 1)
+                    merged[last] = new TunnelTiles(span.X, merged[last].Bottom, Math.Max(merged[last].Top, span.Top));
+                else
+                    merged.Add(span);
+            }
+
+            // Group tunnels side by side that share a row, then keep the groups with an open end. The top
+            // edge of the screen is sky, so a tunnel reaching it is open there.
+            var group = new int[merged.Count];
+            for (int i = 0; i < merged.Count; i++)
+                group[i] = i;
+            int Root(int i) => group[i] == i ? i : group[i] = Root(group[i]);
+            for (int i = 0; i < merged.Count; i++)
+                for (int j = i + 1; j < merged.Count; j++)
+                    if (Math.Abs(merged[i].X - merged[j].X) == 1 && merged[i].Bottom <= merged[j].Top && merged[j].Bottom <= merged[i].Top)
+                        group[Root(i)] = Root(j);
+            var open = new bool[merged.Count];
+            for (int i = 0; i < merged.Count; i++)
+            {
+                var span = merged[i];
+                if ((span.Bottom > 0 && !IsSolid(tiles[span.X, span.Bottom - 1]))
+                    || span.Top == height - 1 || !IsSolid(tiles[span.X, span.Top + 1]))
+                    open[Root(i)] = true;
+            }
+            var kept = new List<TunnelTiles>();
+            for (int i = 0; i < merged.Count; i++)
+                if (open[Root(i)])
+                    kept.Add(merged[i]);
+
+            var passage = new bool[width, height];
+            foreach (var span in kept)
+                for (int y = span.Bottom; y <= span.Top; y++)
+                    passage[span.X, y] = true;
+            foreach (var span in kept)
+                for (int y = span.Bottom; y <= span.Top; y++)
+                {
+                    tiles[span.X, y] = TileState.Air;
+                    foreach (int x in new[] { span.X - 1, span.X + 1 })
+                        if (x >= 0 && x < width && !ground[x, y] && !passage[x, y])
+                            tiles[x, y] = TileState.Solid;
+                }
+
+            kept.Sort((a, b) => a.X != b.X ? a.X.CompareTo(b.X) : b.Top.CompareTo(a.Top));
+            return kept;
         }
 
         private static bool IsSolid(TileState tile) => tile.Terrain == Room.Tile.TerrainType.Solid;

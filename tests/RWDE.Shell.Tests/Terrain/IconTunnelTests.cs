@@ -97,6 +97,73 @@ namespace RWDE.Shell.Tests.Terrain
             Assert.That(IconTunnelDetector.Detect(icons), Is.EqualTo(expected));
         }
 
+        [Test]
+        public void SeamRoundsTheSameWayOnNegativeCoordinates()
+        {
+            // Monitors left of the main one have negative x. Two rows whose seam falls half-way between
+            // pixels 159 and 160 must carve the same tile column wherever the screen sits.
+            DesktopLayout At(int dx)
+            {
+                var icons = new List<ScreenRect>();
+                for (int y = 40; y < 160; y += 60)
+                {
+                    icons.Add(new ScreenRect(99 + dx, y, 159 + dx, y + 60));
+                    icons.Add(new ScreenRect(160 + dx, y, 220 + dx, y + 60));
+                }
+                return new DesktopLayout(new ScreenRect(dx, 0, 400 + dx, 400), null, icons);
+            }
+
+            var home = At(0);
+            var left = At(-400);
+
+            Assert.That(IconTunnelDetector.Detect(left.Icons)[0].SeamX, Is.EqualTo(IconTunnelDetector.Detect(home.Icons)[0].SeamX - 400));
+            Assert.That(TerrainRasterizer.Rasterize(left).Tunnels, Is.EqualTo(TerrainRasterizer.Rasterize(home).Tunnels));
+        }
+
+        [Test]
+        public void ATunnelSplitIntoTwoRunsIsCarvedWhole()
+        {
+            // Four rows of pairs down to the floor; the top row's seam is 11 px off the others, so the
+            // rows form two runs that both fall in tile column 8. Each alone looks closed at both ends
+            // (floor below, the other run's icons above), but together they are one tunnel.
+            var icons = new List<ScreenRect>();
+            int[] seams = { 182, 172, 171, 171 };
+            for (int row = 0; row < 4; row++)
+            {
+                int y = 160 + 60 * row;
+                icons.Add(new ScreenRect(seams[row] - 60, y, seams[row], y + 60));
+                icons.Add(new ScreenRect(seams[row], y, seams[row] + 60, y + 60));
+            }
+            var layout = new DesktopLayout(new ScreenRect(0, 0, 400, 400), null, icons);
+
+            Assert.That(IconTunnelDetector.Detect(layout.Icons), Has.Count.EqualTo(2), "two runs");
+            var terrain = TerrainRasterizer.Rasterize(layout);
+
+            Assert.That(terrain.Tunnels, Is.EqualTo(new List<TunnelTiles> { new TunnelTiles(8, 1, 11) }));
+            for (int y = 1; y <= 11; y++)
+                Assert.That(terrain[8, y], Is.EqualTo(Air), "tile 8," + y);
+        }
+
+        [Test]
+        public void WallsNeverFillAnotherTunnel()
+        {
+            // Four rows of pairs, each 10 px right and 50 px down from the one above: two runs whose
+            // tunnels sit in neighbouring columns and share row 12, (8, 12..17) and (9, 7..12).
+            var icons = new List<ScreenRect>();
+            for (int row = 0; row < 4; row++)
+            {
+                int dx = 10 * row, y = 40 + 50 * row;
+                icons.Add(new ScreenRect(100 + dx, y, 160 + dx, y + 60));
+                icons.Add(new ScreenRect(160 + dx, y, 220 + dx, y + 60));
+            }
+            var terrain = TerrainRasterizer.Rasterize(new DesktopLayout(new ScreenRect(0, 0, 400, 400), null, icons));
+
+            Assert.That(terrain.Tunnels, Is.EqualTo(new List<TunnelTiles> { new TunnelTiles(8, 12, 17), new TunnelTiles(9, 7, 12) }));
+            foreach (var tunnel in terrain.Tunnels)
+                for (int y = tunnel.Bottom; y <= tunnel.Top; y++)
+                    Assert.That(terrain[tunnel.X, y], Is.EqualTo(Air), "tile " + tunnel.X + "," + y);
+        }
+
         // These fixtures put the icon columns in tile rows 0-8 from the bottom up.
 
         [Test]
