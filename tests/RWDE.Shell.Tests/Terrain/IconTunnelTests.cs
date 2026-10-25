@@ -165,6 +165,32 @@ namespace RWDE.Shell.Tests.Terrain
         }
 
         [Test]
+        public void ADroppedTunnelsWallNoLongerSealsAnother()
+        {
+            // The layout below with an icon capping the upper tunnel at (8, 19). The upper tunnel is
+            // sealed by icons at both ends and is dropped; without its wall, (9, 12) is open again and
+            // the lower tunnel can be entered from there.
+            var icons = new List<ScreenRect>
+            {
+                new ScreenRect(110, 35, 170, 95), new ScreenRect(170, 26, 230, 86),
+                new ScreenRect(110, 95, 170, 155), new ScreenRect(170, 86, 230, 146),
+                new ScreenRect(160, 0, 220, 26),
+            };
+            for (int y = 160; y < 400; y += 60)
+            {
+                icons.Add(new ScreenRect(130, y, 190, y + 60));
+                icons.Add(new ScreenRect(190, y, 250, y + 60));
+            }
+            var terrain = TerrainRasterizer.Rasterize(new DesktopLayout(new ScreenRect(0, 0, 400, 400), null, icons));
+
+            Assert.That(terrain.Tunnels, Is.EqualTo(new List<TunnelTiles> { new TunnelTiles(9, 1, 11) }));
+            Assert.That(terrain[9, 12], Is.EqualTo(Air), "the way in");
+            // The dropped tunnel stays icon: (8, 12) was never under an icon, the rest of its column is.
+            for (int y = 13; y <= 18; y++)
+                Assert.That(terrain[8, y], Is.EqualTo(Solid), "tile 8," + y);
+        }
+
+        [Test]
         public void AWallThatSealsAnotherTunnelDropsIt()
         {
             // A run of four pairs down to the floor with its seam in tile column 9, (9, 1..11), and above

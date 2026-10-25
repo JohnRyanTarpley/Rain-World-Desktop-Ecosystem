@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using RWDE.Shell.Desktop;
 using RWDE.Sim;
 
@@ -107,7 +108,8 @@ namespace RWDE.Shell.Terrain
         /// tunnel's tiles;</item>
         /// <item>a group of joined tunnels open at one end or more, with every wall built, is carved, with
         /// any closed end left as a dead end, as crawl passages can be in the game; a group closed at
-        /// every end, by icons or by a neighbour's wall, can't be entered and stays solid.</item>
+        /// every end, by icons or by a neighbour's wall, can't be entered and stays solid, and its own
+        /// walls are not built.</item>
         /// </list>
         /// </summary>
         private static List<TunnelTiles> Carve(TileState[,] tiles, bool[,] ground, RoomCoordinates coords, List<IconTunnel> detected)
@@ -153,28 +155,41 @@ namespace RWDE.Shell.Terrain
 
             // Keep the groups with an open end once every kept tunnel's walls are up, since a wall can
             // fill another tunnel's only way in. The top edge of the screen is sky, so a tunnel reaching
-            // it is open there. Dropping a sealed group only takes walls away, so this settles.
-            var kept = new List<int>();
-            for (int i = 0; i < merged.Count; i++)
-                kept.Add(i);
-            while (true)
+            // it is open there. Which groups are open, by root, with the given tunnels dug:
+            bool[] Open(List<int> dug, out TileState[,] planned)
             {
-                var planned = (TileState[,])tiles.Clone();
-                Dig(planned, ground, kept.ConvertAll(i => merged[i]));
+                planned = (TileState[,])tiles.Clone();
+                Dig(planned, ground, dug.ConvertAll(i => merged[i]));
                 var open = new bool[merged.Count];
-                foreach (int i in kept)
+                foreach (int i in dug)
                 {
                     var span = merged[i];
                     if ((span.Bottom > 0 && !IsSolid(planned[span.X, span.Bottom - 1]))
                         || span.Top == height - 1 || !IsSolid(planned[span.X, span.Top + 1]))
                         open[Root(i)] = true;
                 }
-                if (kept.TrueForAll(i => open[Root(i)]))
+                return open;
+            }
+
+            // First drop the groups sealed by icons, the floor or their own walls: no other tunnel can
+            // open them. Then, while another group's wall seals one, drop one sealed group at a time,
+            // since taking its walls away can open the others again. Dropping a group only takes walls
+            // away, so this settles.
+            var kept = new List<int>();
+            for (int i = 0; i < merged.Count; i++)
+                if (Open(Enumerable.Range(0, merged.Count).Where(j => Root(j) == Root(i)).ToList(), out _)[Root(i)])
+                    kept.Add(i);
+            while (true)
+            {
+                var open = Open(kept, out var planned);
+                int sealedGroup = kept.FindIndex(i => !open[Root(i)]);
+                if (sealedGroup < 0)
                 {
                     Array.Copy(planned, tiles, planned.Length);
                     break;
                 }
-                kept.RemoveAll(i => !open[Root(i)]);
+                int root = Root(kept[sealedGroup]);
+                kept.RemoveAll(i => Root(i) == root);
             }
 
             var tunnels = kept.ConvertAll(i => merged[i]);
