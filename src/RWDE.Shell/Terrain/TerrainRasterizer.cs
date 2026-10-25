@@ -56,7 +56,8 @@ namespace RWDE.Shell.Terrain
     /// <list type="bullet">
     /// <item>each desktop icon becomes a block of Solid tiles;</item>
     /// <item>two icon columns side by side get a one-tile tunnel down the line between them (see
-    /// <see cref="IconTunnelDetector"/>), while a single column stays a solid pillar;</item>
+    /// <see cref="IconTunnelDetector"/>) that never cuts the floor or the taskbar, while a single
+    /// column stays a solid pillar;</item>
     /// <item>the taskbar becomes Solid tiles, so its top is the floor creatures walk on;</item>
     /// <item>the bottom tile row is always Solid, so the bottom of the screen is ground and never a
     /// drop out of the room, even when the taskbar is on another edge;</item>
@@ -73,17 +74,25 @@ namespace RWDE.Shell.Terrain
             var coords = new RoomCoordinates(layout.Screen);
             var tiles = new TileState[coords.Width, coords.Height];
 
+            // The floor row and the taskbar are ground that tunnels never cut through.
+            var ground = new bool[coords.Width, coords.Height];
             for (int x = 0; x < coords.Width; x++)
-                tiles[x, 0] = TileState.Solid;
+                ground[x, 0] = true;
+            if (layout.Taskbar.HasValue && coords.TryGetTiles(layout.Taskbar.Value, out var barMin, out var barMax))
+                for (int x = barMin.x; x <= barMax.x; x++)
+                    for (int y = barMin.y; y <= barMax.y; y++)
+                        ground[x, y] = true;
 
-            if (layout.Taskbar.HasValue)
-                Fill(tiles, coords, layout.Taskbar.Value);
+            for (int x = 0; x < coords.Width; x++)
+                for (int y = 0; y < coords.Height; y++)
+                    if (ground[x, y])
+                        tiles[x, y] = TileState.Solid;
             foreach (var icon in layout.Icons)
                 Fill(tiles, coords, icon);
 
             var tunnels = new List<TunnelTiles>();
             foreach (var tunnel in IconTunnelDetector.Detect(layout.Icons))
-                if (Carve(tiles, coords, tunnel, out var carved))
+                if (Carve(tiles, ground, coords, tunnel, out var carved))
                     tunnels.Add(carved);
 
             return new RasterizedDesktop(coords, tiles, FindOpenings(tiles, coords.Width, coords.Height), tunnels);
@@ -91,24 +100,40 @@ namespace RWDE.Shell.Terrain
 
         /// <summary>
         /// Clears the tile column under the tunnel's seam to Air for the height of its icons and makes
-        /// the columns either side Solid, so it is the game's one-tile crawl passage, open at both ends.
+        /// the columns either side Solid, so it is the game's one-tile crawl passage. A tunnel whose
+        /// icons reach the floor or the taskbar stops short of them. One closed end leaves a dead end,
+        /// as crawl passages can be in the game; a tunnel closed at both ends, or crossing ground,
+        /// can't be entered and stays solid.
         /// </summary>
-        private static bool Carve(TileState[,] tiles, RoomCoordinates coords, IconTunnel tunnel, out TunnelTiles carved)
+        private static bool Carve(TileState[,] tiles, bool[,] ground, RoomCoordinates coords, IconTunnel tunnel, out TunnelTiles carved)
         {
             carved = default;
             var seam = new ScreenRect(tunnel.SeamX, tunnel.Top, tunnel.SeamX + 1, tunnel.Bottom);
             if (!coords.TryGetTiles(seam, out var min, out var max)) return false;
 
-            int x = min.x;
-            for (int y = min.y; y <= max.y; y++)
+            int x = min.x, bottom = min.y, top = max.y;
+            while (bottom <= top && ground[x, bottom]) bottom++;
+            while (top >= bottom && ground[x, top]) top--;
+            if (bottom > top) return false;
+            for (int y = bottom; y <= top; y++)
+                if (ground[x, y]) return false;
+
+            // The top edge of the screen is sky, so a tunnel reaching it is open there.
+            bool openBelow = bottom > 0 && !IsSolid(tiles[x, bottom - 1]);
+            bool openAbove = top == coords.Height - 1 || !IsSolid(tiles[x, top + 1]);
+            if (!openBelow && !openAbove) return false;
+
+            for (int y = bottom; y <= top; y++)
             {
                 tiles[x, y] = TileState.Air;
-                if (x > 0) tiles[x - 1, y] = TileState.Solid;
-                if (x < coords.Width - 1) tiles[x + 1, y] = TileState.Solid;
+                if (x > 0 && !ground[x - 1, y]) tiles[x - 1, y] = TileState.Solid;
+                if (x < coords.Width - 1 && !ground[x + 1, y]) tiles[x + 1, y] = TileState.Solid;
             }
-            carved = new TunnelTiles(x, min.y, max.y);
+            carved = new TunnelTiles(x, bottom, top);
             return true;
         }
+
+        private static bool IsSolid(TileState tile) => tile.Terrain == Room.Tile.TerrainType.Solid;
 
         private static void Fill(TileState[,] tiles, RoomCoordinates coords, ScreenRect rect)
         {

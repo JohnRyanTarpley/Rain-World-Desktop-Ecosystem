@@ -1,0 +1,13 @@
+{
+  "comment": "tunnel-on-floor with a 40 px taskbar along the bottom under the lowest icons (as with an auto-hidden taskbar): the tunnel stops above the taskbar.",
+  "screen": [0, 0, 400, 400],
+  "taskbar": [0, 360, 400, 400],
+  "icons": [
+    [100, 220, 160, 280],
+    [100, 280, 160, 340],
+    [100, 340, 160, 400],
+    [160, 220, 220, 280],
+    [160, 280, 220, 340],
+    [160, 340, 220, 400]
+  ]
+}

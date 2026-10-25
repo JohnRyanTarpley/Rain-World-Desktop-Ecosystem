@@ -75,5 +75,58 @@ namespace RWDE.Shell.Tests.Terrain
                 for (int x = 5; x <= 10; x++)
                     Assert.That(terrain[x, y], Is.EqualTo(y >= 15 && y <= 17 ? Solid : Air), "tile " + x + "," + y);
         }
+
+        // These fixtures put the icon columns in tile rows 0-8 from the bottom up.
+
+        [Test]
+        public void TunnelStopsAboveTheFloorRow()
+        {
+            var layout = DesktopFixtures.Load("tunnel-on-floor");
+
+            var terrain = TerrainRasterizer.Rasterize(layout);
+
+            Assert.That(terrain.Tunnels, Is.EqualTo(new List<TunnelTiles> { new TunnelTiles(8, 1, 8) }));
+            Assert.That(terrain[8, 0], Is.EqualTo(Solid), "the floor stays whole");
+            Assert.That(terrain[8, 9], Is.EqualTo(Air), "open at the top");
+            Assert.That(terrain.Openings, Has.None.Matches<EdgeOpening>(o => o.Edge == RoomEdge.Bottom));
+        }
+
+        [Test]
+        public void TunnelStopsAboveTheTaskbar()
+        {
+            var layout = DesktopFixtures.Load("tunnel-over-taskbar");
+
+            var terrain = TerrainRasterizer.Rasterize(layout);
+
+            Assert.That(terrain.Tunnels, Is.EqualTo(new List<TunnelTiles> { new TunnelTiles(8, 2, 8) }));
+            Assert.That(terrain[8, 0], Is.EqualTo(Solid));
+            Assert.That(terrain[8, 1], Is.EqualTo(Solid), "the taskbar stays whole");
+        }
+
+        [Test]
+        public void TunnelBlockedAtOneEndIsADeadEnd()
+        {
+            var layout = DesktopFixtures.Load("tunnel-dead-end");
+
+            var terrain = TerrainRasterizer.Rasterize(layout);
+
+            Assert.That(terrain.Tunnels, Is.EqualTo(new List<TunnelTiles> { new TunnelTiles(8, 9, 17) }));
+            Assert.That(terrain[8, 8], Is.EqualTo(Solid), "the lone icon below closes the bottom");
+            Assert.That(terrain[8, 18], Is.EqualTo(Air), "still open at the top");
+        }
+
+        [Test]
+        public void TunnelBlockedAtBothEndsStaysSolid()
+        {
+            var layout = DesktopFixtures.Load("tunnel-sealed");
+
+            Assert.That(IconTunnelDetector.Detect(layout.Icons), Has.Count.EqualTo(1), "the pairs are still detected");
+
+            var terrain = TerrainRasterizer.Rasterize(layout);
+            Assert.That(terrain.Tunnels, Is.Empty);
+            for (int y = 9; y <= 17; y++)
+                for (int x = 5; x <= 10; x++)
+                    Assert.That(terrain[x, y], Is.EqualTo(Solid), "tile " + x + "," + y);
+        }
     }
 }
