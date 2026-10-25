@@ -87,6 +87,28 @@ namespace RWDE.Graphics.Tests
             StringAssert.Contains("bad png", report.Problems[0]);
         }
 
+        [Test]
+        public void MalformedAtlasDataIsReportedAndTheRestStillLoad()
+        {
+            var manager = new FAtlasManager();
+
+            var report = GameAtlases.LoadAll(Dlc.None, Finder(BaseAtlases),
+                a => a.Name == "shelterGate" ? manager.LoadAtlasFromJson(a.Name, "{\"frames\": {", null, 4, 4) : Load(manager, a));
+
+            Assert.AreEqual(1, report.Problems.Count);
+            StringAssert.Contains("shelterGate", report.Problems[0]);
+            Assert.AreEqual(BaseAtlases.Where(n => n != "shelterGate").ToArray(), report.Loaded.Select(a => a.name).ToArray());
+        }
+
+        [Test]
+        public void DuplicateElementNamesStillThrow()
+        {
+            var manager = new FAtlasManager();
+
+            Assert.Throws<FutileException>(() => GameAtlases.LoadAll(Dlc.None, Finder(BaseAtlases),
+                a => manager.LoadAtlasFromJson(a.Name, TestAtlases.OtherJson, null, 4, 4)));
+        }
+
         // Atlases with one element named "<atlas>_element"; no files are read.
         private static System.Func<string, AssetResult<AtlasAsset>> Finder(IEnumerable<string> present)
         {

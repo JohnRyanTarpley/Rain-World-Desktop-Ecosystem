@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using NUnit.Framework;
 using RWDE.Sim;
 
@@ -153,10 +154,14 @@ namespace RWDE.Graphics.Tests
         }
 
         [Test]
-        public void MalformedJsonThrowsFutileException()
+        public void MalformedAtlasDataThrowsInvalidDataException()
         {
-            Assert.Throws<FutileException>(() => FAtlas.FromTexturePackerJson("bad", "{\"frames\": {", null, 4, 4));
-            Assert.Throws<FutileException>(() => FAtlas.FromTexturePackerJson("bad", "{\"meta\": {}}", null, 4, 4));
+            // Bad data in the install, not a programming error, so the atlas loader can report it and go on.
+            Assert.Throws<InvalidDataException>(() => FAtlas.FromTexturePackerJson("bad", "{\"frames\": {", null, 4, 4));
+            Assert.Throws<InvalidDataException>(() => FAtlas.FromTexturePackerJson("bad", "{\"meta\": {}}", null, 4, 4));
+            Assert.Throws<InvalidDataException>(() => FAtlas.FromTexturePackerJson("bad", "{\"frames\": {\"a.png\": 3}}", null, 4, 4));
+            Assert.Throws<InvalidDataException>(() => FAtlas.FromTexturePackerJson("bad",
+                TestAtlases.OtherJson.Replace("\"trimmed\": false,", ""), null, 4, 4));
         }
     }
 }

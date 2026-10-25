@@ -77,8 +77,9 @@ namespace RWDE.Graphics
         /// <summary>
         /// Looks up each atlas for <paramref name="installed"/> with <paramref name="find"/> and loads it with
         /// <paramref name="load"/> (e.g. <c>FutileRenderer.LoadAtlas</c>). A missing atlas or one that fails
-        /// to load is reported and the rest still load; a programming error such as a duplicate element
-        /// name (<see cref="FutileException"/>) is thrown.
+        /// to load, including one with malformed atlas data (<see cref="FAtlas.FromTexturePackerJson"/>
+        /// throws <see cref="System.IO.InvalidDataException"/> for that), is reported and the rest still load;
+        /// a programming error such as a duplicate element name (<see cref="FutileException"/>) is thrown.
         /// </summary>
         public static LoadReport LoadAll(Dlc installed, Func<string, AssetResult<AtlasAsset>> find, Func<AtlasAsset, FAtlas> load)
         {
