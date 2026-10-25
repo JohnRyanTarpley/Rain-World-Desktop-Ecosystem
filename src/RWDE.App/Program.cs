@@ -78,16 +78,16 @@ namespace RWDE.App
             UserMessages.Log($"Overlay in {window.Mode} mode over {window.Bounds}.");
 
             renderer.RegisterWhiteElement(Futile.atlasManager);
-            var rainWorld = assets.GetAtlas("rainWorld");
-            if (rainWorld.TryGet(out var atlas))
-            {
-                var loaded = renderer.LoadAtlas(Futile.atlasManager, atlas);
-                UserMessages.Log($"Loaded atlas {atlas}: {loaded.elements.Count} elements, {loaded.textureSize.x}x{loaded.textureSize.y}.");
-            }
-            else
-            {
-                UserMessages.Log("No rainWorld atlas: " + rainWorld.Missing);
-            }
+            Futile.atlasManager.UnknownElement += UserMessages.Log;
+            var atlases = GameAtlases.LoadAll(assets, atlas => renderer.LoadAtlas(Futile.atlasManager, atlas));
+            foreach (var loaded in atlases.Loaded)
+                UserMessages.Log($"Loaded atlas {loaded}: {loaded.elements.Count} elements, {loaded.textureSize.x}x{loaded.textureSize.y}.");
+            foreach (var problem in atlases.Problems) UserMessages.Print(problem);
+
+            // As the RoomCamera constructor; the room's own palette replaces it once rooms load one.
+            var palettes = new RoomPaletteLoader(assets);
+            palettes.ChangeMainPalette(0);
+            UserMessages.Log($"Loaded palette {palettes.paletteA}: black {palettes.currentPalette.blackColor}, fog {palettes.currentPalette.fogColor}.");
 
             var stage = new FStage();
             var probe = new DesktopProbe(stage, window);

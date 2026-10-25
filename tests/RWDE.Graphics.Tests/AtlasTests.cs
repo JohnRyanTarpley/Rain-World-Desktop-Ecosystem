@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using NUnit.Framework;
 using RWDE.Sim;
 
@@ -73,12 +74,50 @@ namespace RWDE.Graphics.Tests
         [Test]
         public void UnknownElementThrowsWithASuggestion()
         {
+            _manager.throwOnUnknownElement = true;
+
             var e = Assert.Throws<FutileException>(() => _manager.GetElementWithName("Atlases/squ.png"));
             StringAssert.Contains("'Atlases/squ.png'", e.Message);
             StringAssert.Contains("Did you mean 'square'", e.Message);
 
             e = Assert.Throws<FutileException>(() => _manager.GetElementWithName("nothingLikeIt"));
             StringAssert.DoesNotContain("Did you mean", e.Message);
+        }
+
+        [Test]
+        public void UnknownElementsFailLoudlyInDevelopmentBuilds()
+        {
+#if DEBUG
+            Assert.IsTrue(FAtlasManager.DevelopmentBuild);
+#else
+            Assert.IsFalse(FAtlasManager.DevelopmentBuild);
+#endif
+            Assert.AreEqual(FAtlasManager.DevelopmentBuild, new FAtlasManager().throwOnUnknownElement);
+        }
+
+        [Test]
+        public void ReleaseBuildsReportAnUnknownElementOnceAndDrawWhite()
+        {
+            _manager.throwOnUnknownElement = false;
+            var reports = new System.Collections.Generic.List<string>();
+            _manager.UnknownElement += reports.Add;
+
+            var first = _manager.GetElementWithName("squ");
+            var again = new FSprite("squ").element;
+
+            Assert.AreSame(_manager.GetElementWithName(Futile.WhiteElementName), first);
+            Assert.AreSame(first, again);
+            Assert.AreEqual(1, reports.Count);
+            StringAssert.Contains("Did you mean 'square'", reports[0]);
+        }
+
+        [Test]
+        public void ReleaseBuildsStillThrowWithoutTheWhiteElement()
+        {
+            var manager = new FAtlasManager { throwOnUnknownElement = false };
+            manager.LoadAtlasFromJson("testAtlas", TestAtlases.Json, null, 64, 32);
+
+            Assert.Throws<FutileException>(() => manager.GetElementWithName("nothingLikeIt"));
         }
 
         [Test]
@@ -115,10 +154,14 @@ namespace RWDE.Graphics.Tests
         }
 
         [Test]
-        public void MalformedJsonThrowsFutileException()
+        public void MalformedAtlasDataThrowsInvalidDataException()
         {
-            Assert.Throws<FutileException>(() => FAtlas.FromTexturePackerJson("bad", "{\"frames\": {", null, 4, 4));
-            Assert.Throws<FutileException>(() => FAtlas.FromTexturePackerJson("bad", "{\"meta\": {}}", null, 4, 4));
+            // Bad data in the install, not a programming error, so the atlas loader can report it and go on.
+            Assert.Throws<InvalidDataException>(() => FAtlas.FromTexturePackerJson("bad", "{\"frames\": {", null, 4, 4));
+            Assert.Throws<InvalidDataException>(() => FAtlas.FromTexturePackerJson("bad", "{\"meta\": {}}", null, 4, 4));
+            Assert.Throws<InvalidDataException>(() => FAtlas.FromTexturePackerJson("bad", "{\"frames\": {\"a.png\": 3}}", null, 4, 4));
+            Assert.Throws<InvalidDataException>(() => FAtlas.FromTexturePackerJson("bad",
+                TestAtlases.OtherJson.Replace("\"trimmed\": false,", ""), null, 4, 4));
         }
     }
 }

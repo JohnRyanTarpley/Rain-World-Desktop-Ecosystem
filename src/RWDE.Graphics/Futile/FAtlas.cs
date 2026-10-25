@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using RWDE.Sim;
 
 namespace RWDE.Graphics
@@ -37,11 +38,26 @@ namespace RWDE.Graphics
         public IReadOnlyList<FAtlasElement> elements => _elements;
 
         /// <summary>An atlas from TexturePacker JSON (FAtlas.LoadAtlasData).</summary>
-        /// <exception cref="FutileException">The JSON has no "frames" object.</exception>
+        /// <exception cref="InvalidDataException">The JSON is malformed, has no "frames" object, or a frame is
+        /// missing a field or has one of the wrong type. It comes from the user's install, so callers can
+        /// report it rather than treat it as a bug.</exception>
         /// <exception cref="NotSupportedException">A frame is rotated, which Futile does not support.</exception>
         public static FAtlas FromTexturePackerJson(string name, string json, object texture, int textureWidth, int textureHeight)
         {
             if (textureWidth <= 0 || textureHeight <= 0) throw new ArgumentException("Atlas texture size must be positive");
+            try
+            {
+                return ParseTexturePackerJson(name, json, texture, textureWidth, textureHeight);
+            }
+            catch (Exception e) when (e is FutileException || e is InvalidCastException || e is NullReferenceException
+                                      || e is FormatException || e is OverflowException)
+            {
+                throw new InvalidDataException("The atlas " + name + " has malformed data: " + e.Message, e);
+            }
+        }
+
+        private static FAtlas ParseTexturePackerJson(string name, string json, object texture, int textureWidth, int textureHeight)
+        {
             var atlas = new FAtlas(name, texture, textureWidth, textureHeight, false);
             if (!(AtlasJson.Parse(json) is AtlasJson.JsonObject root) || !(root.Get("frames") is AtlasJson.JsonObject frames))
                 throw new FutileException("The atlas " + name + " was not a proper JSON file. Make sure to select \"Unity3D\" in TexturePacker.");
