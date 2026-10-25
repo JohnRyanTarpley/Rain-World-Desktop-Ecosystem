@@ -1,0 +1,10 @@
+{
+  "comment": "3840x2160 at 200% scaling: an 80 px taskbar along the bottom and a column of three icons down the left edge, with the few pixels of jitter explorer reports.",
+  "screen": [0, 0, 3840, 2160],
+  "taskbar": [0, 2080, 3840, 2160],
+  "icons": [
+    [4, 4, 156, 196],
+    [3, 196, 156, 389],
+    [4, 388, 157, 580]
+  ]
+}

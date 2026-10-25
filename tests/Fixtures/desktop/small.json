@@ -1,0 +1,8 @@
+{
+  "comment": "A 400x300 screen (20x15 tiles), a 40 px taskbar along the bottom and one 40x40 icon in the top-left corner.",
+  "screen": [0, 0, 400, 300],
+  "taskbar": [0, 260, 400, 300],
+  "icons": [
+    [0, 0, 40, 40]
+  ]
+}

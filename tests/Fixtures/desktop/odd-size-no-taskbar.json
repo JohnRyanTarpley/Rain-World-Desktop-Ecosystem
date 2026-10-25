@@ -1,0 +1,6 @@
+{
+  "comment": "A 410x305 screen (not a multiple of 20) with no taskbar and no icons.",
+  "screen": [0, 0, 410, 305],
+  "taskbar": null,
+  "icons": []
+}
