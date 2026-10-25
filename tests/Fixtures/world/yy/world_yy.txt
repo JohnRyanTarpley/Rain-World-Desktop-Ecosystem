@@ -1,0 +1,27 @@
+// Invented test region "yy" for the spawner tests. Not a real Rain World region.
+ROOMS
+YY_A01 : YY_A02, YY_S01
+YY_A02 : YY_A01, YY_A03 : SWARMROOM
+YY_A03 : YY_A02, YY_A04 : SWARMROOM
+YY_A04 : YY_A03 : SWARMROOM
+YY_S01 : YY_A01 : SHELTER
+END ROOMS
+
+CREATURES
+//all
+YY_A01 : 2-Green, 3-Pink-2
+YY_A02 : 4-Small Centipede-3, 5-Mimic-{12}
+LINEAGE : YY_A03 : 2 : NONE-0.5, EggBug-0
+
+//campaign spawns
+(White)OFFSCREEN : 0-Scavenger-3
+(White,Yellow)YY_A04 : 2-CicadaB-2
+(X-White)YY_A04 : 4-Blue
+(Red)LINEAGE : YY_A02 : 3 : Red-0.1, Cyan-0
+(Red)YY_NOWHERE : 1-Green
+(Yellow)YY_A04 : 3-Leech
+END CREATURES
+
+BAT MIGRATION BLOCKAGES
+YY_S01
+END BAT MIGRATION BLOCKAGES

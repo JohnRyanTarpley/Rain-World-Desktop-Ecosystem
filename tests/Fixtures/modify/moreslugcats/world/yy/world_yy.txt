@@ -1,0 +1,9 @@
+[FINDLINESTART]YY_A01 :
+[REPLACE_2]
+[MERGE]
+CREATURES
+(X-Saint)YY_A01 : 2-Green, 3-Pink-2
+(Saint)YY_A01 : 2-Caramel-{PreCycle}, 3-Yellow-4
+(Saint)OFFSCREEN : 0-MirosVulture-2-{Night}
+END CREATURES
+[ENDMERGE]
