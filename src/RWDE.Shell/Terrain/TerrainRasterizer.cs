@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using RWDE.Shell.Desktop;
 using RWDE.Sim;
 
@@ -103,14 +102,14 @@ namespace RWDE.Shell.Terrain
         /// <list type="bullet">
         /// <item>a tunnel whose icons reach the floor or the taskbar stops short of them; one crossing
         /// them stays solid;</item>
+        /// <item>a tunnel in the first or last tile column, with no room for a wall on its outer side,
+        /// stays solid rather than opening onto the screen edge;</item>
         /// <item>tunnels in the same column that touch become one;</item>
-        /// <item>tunnels side by side that share a row join up there, and a wall is never built on another
-        /// tunnel's tiles;</item>
-        /// <item>a group of joined tunnels open at one end or more, with every wall built, is carved, with
-        /// any closed end left as a dead end, as crawl passages can be in the game; a group closed at
-        /// every end, by icons or by a neighbour's wall, can't be entered and stays solid, and its own
-        /// walls are not built.</item>
+        /// <item>a wall is never built on another tunnel's tiles.</item>
         /// </list>
+        /// A tunnel closed at one end or both is still carved. A dead end is an ordinary crawl passage in
+        /// the game, and one nothing can reach is an air pocket no creature can get to, the same as solid
+        /// terrain to every creature; game rooms have those too.
         /// </summary>
         private static List<TunnelTiles> Carve(TileState[,] tiles, bool[,] ground, RoomCoordinates coords, List<IconTunnel> detected)
         {
@@ -122,6 +121,7 @@ namespace RWDE.Shell.Terrain
                 var seam = new ScreenRect(tunnel.SeamX, tunnel.Top, tunnel.SeamX + 1, tunnel.Bottom);
                 if (!coords.TryGetTiles(seam, out var min, out var max)) continue;
                 int x = min.x, bottom = min.y, top = max.y;
+                if (x == 0 || x == width - 1) continue;
                 while (bottom <= top && ground[x, bottom]) bottom++;
                 while (top >= bottom && ground[x, top]) top--;
                 bool crossesGround = false;
@@ -143,79 +143,22 @@ namespace RWDE.Shell.Terrain
                     merged.Add(span);
             }
 
-            // Group tunnels side by side that share a row.
-            var group = new int[merged.Count];
-            for (int i = 0; i < merged.Count; i++)
-                group[i] = i;
-            int Root(int i) => group[i] == i ? i : group[i] = Root(group[i]);
-            for (int i = 0; i < merged.Count; i++)
-                for (int j = i + 1; j < merged.Count; j++)
-                    if (Math.Abs(merged[i].X - merged[j].X) == 1 && merged[i].Bottom <= merged[j].Top && merged[j].Bottom <= merged[i].Top)
-                        group[Root(i)] = Root(j);
-
-            // Keep the groups with an open end once every kept tunnel's walls are up, since a wall can
-            // fill another tunnel's only way in. The top edge of the screen is sky, so a tunnel reaching
-            // it is open there. Which groups are open, by root, with the given tunnels dug:
-            bool[] Open(List<int> dug, out TileState[,] planned)
-            {
-                planned = (TileState[,])tiles.Clone();
-                Dig(planned, ground, dug.ConvertAll(i => merged[i]));
-                var open = new bool[merged.Count];
-                foreach (int i in dug)
-                {
-                    var span = merged[i];
-                    if ((span.Bottom > 0 && !IsSolid(planned[span.X, span.Bottom - 1]))
-                        || span.Top == height - 1 || !IsSolid(planned[span.X, span.Top + 1]))
-                        open[Root(i)] = true;
-                }
-                return open;
-            }
-
-            // First drop the groups sealed by icons, the floor or their own walls: no other tunnel can
-            // open them. Then, while another group's wall seals one, drop one sealed group at a time,
-            // since taking its walls away can open the others again. Dropping a group only takes walls
-            // away, so this settles.
-            var kept = new List<int>();
-            for (int i = 0; i < merged.Count; i++)
-                if (Open(Enumerable.Range(0, merged.Count).Where(j => Root(j) == Root(i)).ToList(), out _)[Root(i)])
-                    kept.Add(i);
-            while (true)
-            {
-                var open = Open(kept, out var planned);
-                int sealedGroup = kept.FindIndex(i => !open[Root(i)]);
-                if (sealedGroup < 0)
-                {
-                    Array.Copy(planned, tiles, planned.Length);
-                    break;
-                }
-                int root = Root(kept[sealedGroup]);
-                kept.RemoveAll(i => Root(i) == root);
-            }
-
-            var tunnels = kept.ConvertAll(i => merged[i]);
-            tunnels.Sort((a, b) => a.X != b.X ? a.X.CompareTo(b.X) : b.Top.CompareTo(a.Top));
-            return tunnels;
-        }
-
-        /// <summary>Clears each span to Air and makes the tiles either side Solid, except ground and other spans.</summary>
-        private static void Dig(TileState[,] tiles, bool[,] ground, List<TunnelTiles> spans)
-        {
-            int width = tiles.GetLength(0), height = tiles.GetLength(1);
             var passage = new bool[width, height];
-            foreach (var span in spans)
+            foreach (var span in merged)
                 for (int y = span.Bottom; y <= span.Top; y++)
                     passage[span.X, y] = true;
-            foreach (var span in spans)
+            foreach (var span in merged)
                 for (int y = span.Bottom; y <= span.Top; y++)
                 {
                     tiles[span.X, y] = TileState.Air;
                     foreach (int x in new[] { span.X - 1, span.X + 1 })
-                        if (x >= 0 && x < width && !ground[x, y] && !passage[x, y])
+                        if (!ground[x, y] && !passage[x, y])
                             tiles[x, y] = TileState.Solid;
                 }
-        }
 
-        private static bool IsSolid(TileState tile) => tile.Terrain == Room.Tile.TerrainType.Solid;
+            merged.Sort((a, b) => a.X != b.X ? a.X.CompareTo(b.X) : b.Top.CompareTo(a.Top));
+            return merged;
+        }
 
         private static void Fill(TileState[,] tiles, RoomCoordinates coords, ScreenRect rect)
         {

@@ -124,8 +124,7 @@ namespace RWDE.Shell.Tests.Terrain
         public void ATunnelSplitIntoTwoRunsIsCarvedWhole()
         {
             // Four rows of pairs down to the floor; the top row's seam is 11 px off the others, so the
-            // rows form two runs that both fall in tile column 8. Each alone looks closed at both ends
-            // (floor below, the other run's icons above), but together they are one tunnel.
+            // rows form two runs. Both fall in tile column 8 and touch, so they are one tunnel.
             var icons = new List<ScreenRect>();
             int[] seams = { 182, 172, 171, 171 };
             for (int row = 0; row < 4; row++)
@@ -165,53 +164,24 @@ namespace RWDE.Shell.Tests.Terrain
         }
 
         [Test]
-        public void ADroppedTunnelsWallNoLongerSealsAnother()
+        public void NoTunnelInTheEdgeColumns()
         {
-            // The layout below with an icon capping the upper tunnel at (8, 19). The upper tunnel is
-            // sealed by icons at both ends and is dropped; without its wall, (9, 12) is open again and
-            // the lower tunnel can be entered from there.
-            var icons = new List<ScreenRect>
+            // Two rows of 16 px icons against the left edge put the seam in tile column 0, where there is
+            // no room for an outer wall: carving it would open a new exit in the screen edge.
+            var icons = new List<ScreenRect>();
+            for (int y = 100; y < 132; y += 16)
             {
-                new ScreenRect(110, 35, 170, 95), new ScreenRect(170, 26, 230, 86),
-                new ScreenRect(110, 95, 170, 155), new ScreenRect(170, 86, 230, 146),
-                new ScreenRect(160, 0, 220, 26),
-            };
-            for (int y = 160; y < 400; y += 60)
-            {
-                icons.Add(new ScreenRect(130, y, 190, y + 60));
-                icons.Add(new ScreenRect(190, y, 250, y + 60));
+                icons.Add(new ScreenRect(0, y, 16, y + 16));
+                icons.Add(new ScreenRect(16, y, 32, y + 16));
             }
-            var terrain = TerrainRasterizer.Rasterize(new DesktopLayout(new ScreenRect(0, 0, 400, 400), null, icons));
+            var layout = new DesktopLayout(new ScreenRect(0, 0, 400, 400), null, icons);
 
-            Assert.That(terrain.Tunnels, Is.EqualTo(new List<TunnelTiles> { new TunnelTiles(9, 1, 11) }));
-            Assert.That(terrain[9, 12], Is.EqualTo(Air), "the way in");
-            // The dropped tunnel stays icon: (8, 12) was never under an icon, the rest of its column is.
-            for (int y = 13; y <= 18; y++)
-                Assert.That(terrain[8, y], Is.EqualTo(Solid), "tile 8," + y);
-        }
+            Assert.That(IconTunnelDetector.Detect(layout.Icons), Has.Count.EqualTo(1), "the pairs are still detected");
+            var terrain = TerrainRasterizer.Rasterize(layout);
 
-        [Test]
-        public void AWallThatSealsAnotherTunnelDropsIt()
-        {
-            // A run of four pairs down to the floor with its seam in tile column 9, (9, 1..11), and above
-            // it a run of two pairs with its seam in column 8, (8, 12..18). The upper right icons stop
-            // short of tile (9, 12), so the lower tunnel looks open at the top until the upper tunnel's
-            // right wall fills that tile. With the floor below, it can't be entered and stays solid.
-            var icons = new List<ScreenRect>
-            {
-                new ScreenRect(110, 35, 170, 95), new ScreenRect(170, 26, 230, 86),
-                new ScreenRect(110, 95, 170, 155), new ScreenRect(170, 86, 230, 146),
-            };
-            for (int y = 160; y < 400; y += 60)
-            {
-                icons.Add(new ScreenRect(130, y, 190, y + 60));
-                icons.Add(new ScreenRect(190, y, 250, y + 60));
-            }
-            var terrain = TerrainRasterizer.Rasterize(new DesktopLayout(new ScreenRect(0, 0, 400, 400), null, icons));
-
-            Assert.That(terrain.Tunnels, Is.EqualTo(new List<TunnelTiles> { new TunnelTiles(8, 12, 18) }));
-            for (int y = 1; y <= 12; y++)
-                Assert.That(terrain[9, y], Is.EqualTo(Solid), "tile 9," + y);
+            Assert.That(terrain.Tunnels, Is.Empty);
+            Assert.That(terrain[0, 13], Is.EqualTo(Solid));
+            Assert.That(terrain[0, 14], Is.EqualTo(Solid));
         }
 
         // These fixtures put the icon columns in tile rows 0-8 from the bottom up.
@@ -254,17 +224,18 @@ namespace RWDE.Shell.Tests.Terrain
         }
 
         [Test]
-        public void TunnelBlockedAtBothEndsStaysSolid()
+        public void TunnelBlockedAtBothEndsIsStillCarved()
         {
+            // Nothing can get in, so to every creature it is the same as solid terrain.
             var layout = DesktopFixtures.Load("tunnel-sealed");
 
-            Assert.That(IconTunnelDetector.Detect(layout.Icons), Has.Count.EqualTo(1), "the pairs are still detected");
-
             var terrain = TerrainRasterizer.Rasterize(layout);
-            Assert.That(terrain.Tunnels, Is.Empty);
+
+            Assert.That(terrain.Tunnels, Is.EqualTo(new List<TunnelTiles> { new TunnelTiles(8, 9, 17) }));
+            Assert.That(terrain[8, 8], Is.EqualTo(Solid));
+            Assert.That(terrain[8, 18], Is.EqualTo(Solid));
             for (int y = 9; y <= 17; y++)
-                for (int x = 5; x <= 10; x++)
-                    Assert.That(terrain[x, y], Is.EqualTo(Solid), "tile " + x + "," + y);
+                Assert.That(terrain[8, y], Is.EqualTo(Air), "tile 8," + y);
         }
     }
 }

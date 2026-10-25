@@ -1,5 +1,5 @@
 {
-  "comment": "tunnel-dead-end with another lone icon over the right column, covering the tile above the tunnel: closed at both ends, so no tunnel.",
+  "comment": "tunnel-dead-end with another lone icon over the right column, covering the tile above the tunnel. Closed at both ends, it is still carved, but nothing can get in.",
   "screen": [0, 0, 400, 400],
   "taskbar": null,
   "icons": [
