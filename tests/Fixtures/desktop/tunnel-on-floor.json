@@ -1,0 +1,13 @@
+{
+  "comment": "A 400x400 screen with no taskbar and two columns of three 60x60 icons standing on the bottom edge: the tunnel stops above the floor row.",
+  "screen": [0, 0, 400, 400],
+  "taskbar": null,
+  "icons": [
+    [100, 220, 160, 280],
+    [100, 280, 160, 340],
+    [100, 340, 160, 400],
+    [160, 220, 220, 280],
+    [160, 280, 220, 340],
+    [160, 340, 220, 400]
+  ]
+}

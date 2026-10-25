@@ -1,0 +1,10 @@
+{
+  "comment": "The left column of tunnel-two-wide on its own: a solid pillar, no tunnel.",
+  "screen": [0, 0, 400, 400],
+  "taskbar": null,
+  "icons": [
+    [101, 40, 160, 100],
+    [100, 99, 159, 160],
+    [102, 161, 161, 220]
+  ]
+}

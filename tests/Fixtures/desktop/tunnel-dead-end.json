@@ -1,0 +1,14 @@
+{
+  "comment": "tunnel-two-wide with a lone icon under the right column, covering the tile below the tunnel: a dead end at the bottom, still open at the top.",
+  "screen": [0, 0, 400, 400],
+  "taskbar": null,
+  "icons": [
+    [101, 40, 160, 100],
+    [100, 99, 159, 160],
+    [102, 161, 161, 220],
+    [160, 41, 221, 100],
+    [159, 100, 220, 159],
+    [161, 160, 220, 221],
+    [160, 220, 220, 280]
+  ]
+}

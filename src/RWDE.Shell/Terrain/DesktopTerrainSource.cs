@@ -6,8 +6,8 @@ namespace RWDE.Shell.Terrain
 {
     /// <summary>
     /// The desktop as the sim's <see cref="ITerrainSource"/>: a rasterised <see cref="DesktopLayout"/>
-    /// in room tiles (y up, 20 px). For now it is a fixed snapshot with no pipes and no diffs;
-    /// tunnels, monitor pipes and live rescans add to it later.
+    /// in room tiles (y up, 20 px), icon tunnels included. For now it is a fixed snapshot with no pipes and no diffs;
+    /// monitor pipes and live rescans add to it later.
     /// </summary>
     public sealed class DesktopTerrainSource : ITerrainSource
     {
