@@ -30,7 +30,10 @@ namespace RWDE.Sim
             public bool verticalBeam;
             public bool horizontalBeam;
             public bool wallbehind;
-            /// <summary>0 = no shortcut; 1 = shortcut path (entrances included). The game uses 2-5 for exits and dens.</summary>
+            /// <summary>
+            /// 0 = no shortcut; 1 = shortcut path (entrances included); 2 = room exit (the end of a pipe
+            /// to another monitor room). The game also uses 3-5 for dens and transportation.
+            /// </summary>
             public int shortCut;
             /// <summary>0 = dry, 1 = deep water, 2 = water surface. The desktop has no water, so this stays 0.</summary>
             public int waterInt;
@@ -76,6 +79,8 @@ namespace RWDE.Sim
         private readonly Tile.TerrainType[,] baseTerrain;
         private readonly Dictionary<int, Pipe> pipes = new Dictionary<int, Pipe>();
         private readonly Dictionary<IntVector2, Pipe> pipeEntrances = new Dictionary<IntVector2, Pipe>();
+        // The room-exit end (B) of each pipe to another room.
+        private readonly Dictionary<IntVector2, Pipe> pipeExits = new Dictionary<IntVector2, Pipe>();
         // How many pipe paths run through each tile; pipes may cross between their entrances.
         private readonly Dictionary<IntVector2, int> pipeCover = new Dictionary<IntVector2, int>();
 
@@ -91,6 +96,7 @@ namespace RWDE.Sim
             for (int x = 0; x < width; x++)
                 for (int y = 0; y < height; y++)
                     Tiles[x, y] = new Tile(x, y, Tile.TerrainType.Air, false, false, false, 0, 0);
+            abstractRoom = new AbstractRoom(this);
         }
 
         /// <summary>A room holding <paramref name="source"/>'s current tiles and pipes. Later changes come through <see cref="ApplyTerrainDiffs"/>.</summary>
@@ -126,6 +132,24 @@ namespace RWDE.Sim
 
         /// <summary>The entrance tile of each entry in <see cref="shortcuts"/>, at the same index.</summary>
         public IntVector2[] shortcutsIndex = new IntVector2[0];
+
+        /// <summary>
+        /// The room exit tile of each of the room's nodes, in node order: the game's <c>exitAndDenIndex</c>,
+        /// ordered as its <c>ShortcutMapper</c> finds them (top row first, left to right). Desktop rooms
+        /// have room exits only (the ends of pipes to other monitor rooms), no dens.
+        /// </summary>
+        public IntVector2[] exitAndDenIndex = new IntVector2[0];
+
+        /// <summary>This room in the abstract world. A room starts out on its own until a <see cref="World"/> adopts it.</summary>
+        public AbstractRoom abstractRoom { get; }
+
+        public World world => abstractRoom.world;
+
+        /// <summary>The game's <c>Room.readyForAI</c>. A desktop room's AI map is built on first use, so it is always ready.</summary>
+        public bool readyForAI => true;
+
+        /// <summary>Goes up each time applied diffs change something, so AI holding paths can tell to repath.</summary>
+        public int TerrainVersion { get; private set; }
 
         public IEnumerable<Pipe> Pipes => pipes.Values;
 
@@ -248,6 +272,36 @@ namespace RWDE.Sim
             return new IntVector2(0, 0);
         }
 
+        // ---- Nodes (Room.ShortcutLeadingToNode, LocalCoordinateOfNode, GetWorldCoordinate) ----
+
+        /// <summary>
+        /// The shortcut whose far end is node <paramref name="node"/>. Like the game, falls back to the
+        /// first shortcut when none leads there (and to a dead end when the room has none).
+        /// </summary>
+        public ShortcutData ShortcutLeadingToNode(int node)
+        {
+            for (int i = 0; i < shortcuts.Length; i++)
+                if (shortcuts[i].destNode == node)
+                    return shortcuts[i];
+            return shortcuts.Length > 0 ? shortcuts[0] : ShortcutData.DeadEnd(new IntVector2(-1, -1));
+        }
+
+        /// <summary>Where in the room node <paramref name="node"/> is entered: its shortcut's entrance tile.</summary>
+        public WorldCoordinate LocalCoordinateOfNode(int node)
+        {
+            var nodes = abstractRoom.nodes;
+            if (node > -1 && node < nodes.Length && nodes[node].type == AbstractRoomNode.Type.Exit)
+            {
+                var entrance = ShortcutLeadingToNode(node).StartTile;
+                return new WorldCoordinate(abstractRoom.index, entrance.x, entrance.y, -1);
+            }
+            return new WorldCoordinate(-1, -1, -1, -1);
+        }
+
+        public WorldCoordinate GetWorldCoordinate(Vector2 pos) => GetWorldCoordinate(GetTilePosition(pos));
+        public WorldCoordinate GetWorldCoordinate(IntVector2 pos) => new WorldCoordinate(abstractRoom.index, pos.x, pos.y, -1);
+        public WorldCoordinate ToWorldCoordinate(IntVector2 pos) => GetWorldCoordinate(pos);
+
         // ---- Terrain diffs, applied between ticks ----
 
         /// <summary>Takes every pending diff from <paramref name="source"/> and applies them in order. Call at the start of a tick.</summary>
@@ -257,8 +311,7 @@ namespace RWDE.Sim
             var before = new Dictionary<IntVector2, TileSnapshot>();
             while (source.TryTakeDiff(out var diff))
                 Apply(diff, changes, before);
-            CollectChangedTiles(changes, before);
-            aimapCache?.ApplyTerrainChanges(changes);
+            Finish(changes, before);
             return changes;
         }
 
@@ -271,9 +324,20 @@ namespace RWDE.Sim
             var changes = new TerrainChanges();
             var before = new Dictionary<IntVector2, TileSnapshot>();
             Apply(diff, changes, before);
-            CollectChangedTiles(changes, before);
-            aimapCache?.ApplyTerrainChanges(changes);
+            Finish(changes, before);
             return changes;
+        }
+
+        private void Finish(TerrainChanges changes, Dictionary<IntVector2, TileSnapshot> before)
+        {
+            CollectChangedTiles(changes, before);
+            if (!changes.Any) return;
+            aimapCache?.ApplyTerrainChanges(changes);
+            if (changes.RemovedPipes.Count > 0 || changes.AddedPipes.Count > 0)
+                abstractRoom.ExitsChanged();
+            else
+                world?.NodeCostsChanged();
+            TerrainVersion++;
         }
 
         private readonly struct TileSnapshot
@@ -361,7 +425,13 @@ namespace RWDE.Sim
                 foreach (var end in new[] { pipe.A, pipe.B })
                     foreach (var other in after.Values)
                         if (other.Id != pipe.Id && Contains(other.Path, end))
-                            throw new ArgumentException(pipe + " has an entrance at " + end + ", which is on " + other + ".");
+                            throw new ArgumentException(pipe + " has an end at " + end + ", which is on " + other + ".");
+
+            // A room has at most one exit per link, or the world couldn't tell which one a link leads to.
+            var links = new HashSet<int>();
+            foreach (var pipe in after.Values)
+                if (pipe.IsRoomExit && !links.Add(pipe.RoomLink))
+                    throw new ArgumentException("Two pipes in the room have room link " + pipe.RoomLink + ".");
         }
 
         private static bool Contains(IReadOnlyList<IntVector2> path, IntVector2 pos)
@@ -375,7 +445,8 @@ namespace RWDE.Sim
         {
             pipes[pipe.Id] = pipe;
             pipeEntrances[pipe.A] = pipe;
-            pipeEntrances[pipe.B] = pipe;
+            if (pipe.IsRoomExit) pipeExits[pipe.B] = pipe;
+            else pipeEntrances[pipe.B] = pipe;
             foreach (var p in pipe.Path)
             {
                 Touch(p, before);
@@ -389,7 +460,8 @@ namespace RWDE.Sim
         {
             pipes.Remove(pipe.Id);
             pipeEntrances.Remove(pipe.A);
-            pipeEntrances.Remove(pipe.B);
+            if (pipe.IsRoomExit) pipeExits.Remove(pipe.B);
+            else pipeEntrances.Remove(pipe.B);
             foreach (var p in pipe.Path)
             {
                 Touch(p, before);
@@ -401,28 +473,42 @@ namespace RWDE.Sim
         }
 
         // A tile's terrain is the source's, except that pipe entrances read as ShortcutEntrance;
-        // every tile on a pipe path, entrances included, has shortCut 1 (the level files' flag 3).
+        // every tile on a pipe path, entrances included, has shortCut 1 (the level files' flag 3),
+        // except the room-exit end of a pipe to another room, which has shortCut 2.
         private void RefreshOverlay(IntVector2 pos)
         {
             var tile = Tiles[pos.x, pos.y];
             tile.Terrain = pipeEntrances.ContainsKey(pos) ? Tile.TerrainType.ShortcutEntrance : baseTerrain[pos.x, pos.y];
-            tile.shortCut = pipeCover.ContainsKey(pos) ? 1 : 0;
+            tile.shortCut = pipeExits.ContainsKey(pos) ? 2 : pipeCover.ContainsKey(pos) ? 1 : 0;
         }
+
+        // Top row first, left to right: the order the game's ShortcutMapper scans in.
+        private static int ScanOrder(IntVector2 a, IntVector2 b) => a.y != b.y ? b.y.CompareTo(a.y) : a.x.CompareTo(b.x);
 
         private void RebuildShortcuts()
         {
+            var exits = new List<IntVector2>(pipeExits.Keys);
+            exits.Sort(ScanOrder);
+            exitAndDenIndex = exits.ToArray();
+
             var entrances = new List<IntVector2>(pipeEntrances.Keys);
-            entrances.Sort((a, b) => a.y != b.y ? b.y.CompareTo(a.y) : a.x.CompareTo(b.x));
+            entrances.Sort(ScanOrder);
             shortcuts = new ShortcutData[entrances.Count];
             shortcutsIndex = new IntVector2[entrances.Count];
             for (int i = 0; i < entrances.Count; i++)
             {
                 var start = entrances[i];
                 var pipe = pipeEntrances[start];
-                shortcuts[i] = new ShortcutData(ShortcutData.Type.Normal, start, pipe.OtherEnd(start), -1, pipe.PathFrom(start), pipe.Id);
+                shortcuts[i] = pipe.IsRoomExit
+                    ? new ShortcutData(ShortcutData.Type.RoomExit, start, pipe.B, exits.IndexOf(pipe.B), pipe.PathFrom(start), pipe.Id)
+                    : new ShortcutData(ShortcutData.Type.Normal, start, pipe.OtherEnd(start), -1, pipe.PathFrom(start), pipe.Id);
                 shortcutsIndex[i] = start;
             }
         }
+
+        /// <summary>The room link of the pipe whose room exit is node <paramref name="node"/>, or -1.</summary>
+        internal int RoomLinkOfNode(int node) =>
+            node >= 0 && node < exitAndDenIndex.Length ? pipeExits[exitAndDenIndex[node]].RoomLink : -1;
 
         private void Touch(IntVector2 pos, Dictionary<IntVector2, TileSnapshot> before)
         {
