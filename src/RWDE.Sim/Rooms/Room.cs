@@ -178,6 +178,20 @@ namespace RWDE.Sim
                 edge.verticalBeam, edge.horizontalBeam, edge.wallbehind, 0, edge.waterInt);
         }
 
+        /// <summary>Whether the tile is solid. The game also counts Watcher terrain curves, which the desktop doesn't have.</summary>
+        public bool HasAnySolid(int x, int y) => GetTile(x, y).Solid;
+        public bool HasAnySolid(IntVector2 pos) => HasAnySolid(pos.x, pos.y);
+
+        // ---- AI map (Room.aimap) ----
+
+        private AImap aimapCache;
+
+        /// <summary>
+        /// The room's AI map, built on first use. After that, <see cref="ApplyTerrainDiff"/> and
+        /// <see cref="ApplyTerrainDiffs"/> rebuild the parts their changes reach.
+        /// </summary>
+        public AImap aimap => aimapCache ??= AImapper.Build(this);
+
         // ---- Slopes (Room.IdentifySlope) ----
 
         public SlopeDirection IdentifySlope(Vector2 pos) => IdentifySlope(GetTilePosition(pos));
@@ -244,6 +258,7 @@ namespace RWDE.Sim
             while (source.TryTakeDiff(out var diff))
                 Apply(diff, changes, before);
             CollectChangedTiles(changes, before);
+            aimapCache?.ApplyTerrainChanges(changes);
             return changes;
         }
 
@@ -257,6 +272,7 @@ namespace RWDE.Sim
             var before = new Dictionary<IntVector2, TileSnapshot>();
             Apply(diff, changes, before);
             CollectChangedTiles(changes, before);
+            aimapCache?.ApplyTerrainChanges(changes);
             return changes;
         }
 

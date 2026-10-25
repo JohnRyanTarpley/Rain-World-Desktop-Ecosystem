@@ -18,5 +18,7 @@ namespace RWDE.Sim
         }
 
         public static float Clamp01(float value) => Clamp(value, 0f, 1f);
+
+        public static float InverseLerp(float a, float b, float value) => a != b ? Clamp01((value - a) / (b - a)) : 0f;
     }
 }
