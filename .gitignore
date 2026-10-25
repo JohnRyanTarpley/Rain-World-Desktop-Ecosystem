@@ -3,6 +3,10 @@
 /bin/swarm.ps1
 /bin/cleanup.ps1
 
+# Claude Code: local settings, including Octogent's hooks to its local servers.
+# Re-include anything meant to be shared if it's ever added, e.g. !.claude/skills/
+.claude/*
+
 # --- .NET build output ---
 # Directory.Build.props sends every project's bin/ and obj/ to /artifacts.
 /artifacts/
