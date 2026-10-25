@@ -179,6 +179,7 @@ namespace RWDE.Graphics.Tests
         public void SetElementByNameThrowsForUnknownNames()
         {
             var sprite = new FSprite("square");
+            Futile.atlasManager.throwOnUnknownElement = true;
 
             Assert.Throws<FutileException>(() => sprite.SetElementByName("noSuchElement"));
             Assert.Throws<FutileException>(() => new FSprite("noSuchElement"));

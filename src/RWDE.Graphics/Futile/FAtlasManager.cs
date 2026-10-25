@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace RWDE.Graphics
@@ -9,11 +10,29 @@ namespace RWDE.Graphics
     /// </summary>
     public sealed class FAtlasManager
     {
+        /// <summary>True in Debug builds of RWDE.Graphics, where an unknown element name throws.</summary>
+#if DEBUG
+        public const bool DevelopmentBuild = true;
+#else
+        public const bool DevelopmentBuild = false;
+#endif
+
         private readonly List<FAtlas> _atlases = new List<FAtlas>();
         private readonly Dictionary<string, FAtlasElement> _allElementsByName = new Dictionary<string, FAtlasElement>();
+        private readonly HashSet<string> _reportedUnknownElements = new HashSet<string>();
         private int _nextAtlasIndex;
 
         public IReadOnlyList<FAtlas> atlases => _atlases;
+
+        /// <summary>
+        /// Whether <see cref="GetElementWithName"/> throws for an unknown name, as the game does. On in
+        /// development builds. Release builds report each unknown name once through
+        /// <see cref="UnknownElement"/> and draw "Futile_White" instead, so one bad name doesn't end the app.
+        /// </summary>
+        public bool throwOnUnknownElement = DevelopmentBuild;
+
+        /// <summary>Raised once per unknown element name, with the error message, when <see cref="throwOnUnknownElement"/> is off.</summary>
+        public event Action<string> UnknownElement;
 
         public IEnumerable<string> ElementNames => _allElementsByName.Keys;
 
@@ -54,7 +73,10 @@ namespace RWDE.Graphics
         public bool DoesContainElementWithName(string elementName) => _allElementsByName.ContainsKey(elementName);
 
         /// <summary>The element called <paramref name="elementName"/> (FAtlasManager.GetElementWithName).</summary>
-        /// <exception cref="FutileException">No such element; the message suggests a close name if there is one.</exception>
+        /// <exception cref="FutileException">
+        /// No such element while <see cref="throwOnUnknownElement"/> is on (or "Futile_White" isn't loaded);
+        /// the message suggests a close name if there is one.
+        /// </exception>
         public FAtlasElement GetElementWithName(string elementName)
         {
             if (elementName != null && _allElementsByName.TryGetValue(elementName, out var element)) return element;
@@ -70,9 +92,13 @@ namespace RWDE.Graphics
                     if (name.Contains(stem)) suggestion = name;
                 }
             }
-            throw new FutileException(suggestion == null
+            var message = suggestion == null
                 ? "Couldn't find element named '" + elementName + "'."
-                : "Couldn't find element named '" + elementName + "'. Did you mean '" + suggestion + "'?");
+                : "Couldn't find element named '" + elementName + "'. Did you mean '" + suggestion + "'?";
+            if (throwOnUnknownElement || !_allElementsByName.TryGetValue(Futile.WhiteElementName, out var white))
+                throw new FutileException(message);
+            if (_reportedUnknownElements.Add(elementName ?? "")) UnknownElement?.Invoke(message);
+            return white;
         }
 
         private FAtlas AddAtlas(FAtlas atlas)
