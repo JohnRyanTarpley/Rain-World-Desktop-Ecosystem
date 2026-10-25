@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <RootNamespace>RWDE.Audio</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../RWDE.Sim/RWDE.Sim.csproj" />
+    <ProjectReference Include="../RWDE.GameAssets/RWDE.GameAssets.csproj" />
+  </ItemGroup>
+
+</Project>

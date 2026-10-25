@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <RootNamespace>RWDE.Interaction</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../RWDE.Sim/RWDE.Sim.csproj" />
+    <ProjectReference Include="../RWDE.Shell/RWDE.Shell.csproj" />
+  </ItemGroup>
+
+</Project>
