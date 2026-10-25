@@ -164,6 +164,30 @@ namespace RWDE.Shell.Tests.Terrain
                     Assert.That(terrain[tunnel.X, y], Is.EqualTo(Air), "tile " + tunnel.X + "," + y);
         }
 
+        [Test]
+        public void AWallThatSealsAnotherTunnelDropsIt()
+        {
+            // A run of four pairs down to the floor with its seam in tile column 9, (9, 1..11), and above
+            // it a run of two pairs with its seam in column 8, (8, 12..18). The upper right icons stop
+            // short of tile (9, 12), so the lower tunnel looks open at the top until the upper tunnel's
+            // right wall fills that tile. With the floor below, it can't be entered and stays solid.
+            var icons = new List<ScreenRect>
+            {
+                new ScreenRect(110, 35, 170, 95), new ScreenRect(170, 26, 230, 86),
+                new ScreenRect(110, 95, 170, 155), new ScreenRect(170, 86, 230, 146),
+            };
+            for (int y = 160; y < 400; y += 60)
+            {
+                icons.Add(new ScreenRect(130, y, 190, y + 60));
+                icons.Add(new ScreenRect(190, y, 250, y + 60));
+            }
+            var terrain = TerrainRasterizer.Rasterize(new DesktopLayout(new ScreenRect(0, 0, 400, 400), null, icons));
+
+            Assert.That(terrain.Tunnels, Is.EqualTo(new List<TunnelTiles> { new TunnelTiles(8, 12, 18) }));
+            for (int y = 1; y <= 12; y++)
+                Assert.That(terrain[9, y], Is.EqualTo(Solid), "tile 9," + y);
+        }
+
         // These fixtures put the icon columns in tile rows 0-8 from the bottom up.
 
         [Test]
