@@ -19,7 +19,8 @@ namespace RWDE.GameAssets.Cache
             public readonly List<string> Skipped = new List<string>();
         }
 
-        public static Report Extract(string assetsFilePath, string outputDirectory)
+        /// <param name="include">Optional filter on the packed atlas name; atlases it rejects are left out silently.</param>
+        public static Report Extract(string assetsFilePath, string outputDirectory, Func<string, bool> include = null)
         {
             var report = new Report();
             var file = SerializedFile.Open(assetsFilePath);
@@ -50,6 +51,7 @@ namespace RWDE.GameAssets.Cache
 
                 foreach (var pair in atlasData)
                 {
+                    if (include != null && !include(pair.Key)) continue;
                     if (!textures.TryGetValue(pair.Key, out var textureInfo))
                     {
                         report.Skipped.Add(pair.Key + " (no texture with the same name)");

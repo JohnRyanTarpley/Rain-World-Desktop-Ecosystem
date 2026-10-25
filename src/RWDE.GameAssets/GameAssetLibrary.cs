@@ -52,6 +52,12 @@ namespace RWDE.GameAssets
 
         public GameAssetCache Cache { get; private set; }
 
+        /// <summary>
+        /// The DLC in the install (a DLC's folder exists under <c>StreamingAssets/mods/</c>), or
+        /// <see cref="Dlc.None"/> when no install was found. A missing DLC is never an error.
+        /// </summary>
+        public Dlc InstalledDlc { get; private set; }
+
         /// <summary>True if a Rain World install was found.</summary>
         public bool Available => Install != null;
 
@@ -81,11 +87,12 @@ namespace RWDE.GameAssets
             {
                 Install = lookup.Install,
                 Cache = new GameAssetCache(options.CacheRoot ?? GameAssetCache.DefaultRoot),
+                InstalledDlc = DlcDetector.Detect(lookup.Install),
             };
 
             try
             {
-                library.Cache.EnsureExtracted(lookup.Install);
+                library.Cache.EnsureExtracted(lookup.Install, library.InstalledDlc);
             }
             catch (Exception e) when (e is IOException || e is InvalidDataException || e is NotSupportedException ||
                                       e is UnauthorizedAccessException)
