@@ -15,17 +15,33 @@ namespace RWDE.App
         readonly ITerrainSource terrain;
 
         /// <param name="spawnData">The Outskirts' world file, or null for a world without spawning.</param>
+        /// <param name="campaignSetting">
+        /// A campaign or <see cref="Campaign.AllOutskirtsCreatures"/>. Only campaigns available with
+        /// <paramref name="staticWorld"/>'s DLC are used: "All Outskirts creatures" merges just those, and a
+        /// campaign whose DLC is off falls back to it (see <see cref="CampaignSetting"/>).
+        /// </param>
         /// <param name="stage">The stage the camera draws on, or null to run without drawing.</param>
         public Simulation(ITerrainSource terrain, StaticWorld staticWorld, RegionSpawnData spawnData,
             string campaignSetting, int seed, FStage stage = null, GraphicsModuleRegistry graphics = null)
         {
             this.terrain = terrain ?? throw new ArgumentNullException(nameof(terrain));
             Room = new Room(terrain);
-            World = spawnData != null && staticWorld != null
-                ? World.Create(staticWorld, spawnData, campaignSetting, seed, null, Room)
-                : new World(seed, Room);
+            CampaignSetting = campaignSetting;
+            if (spawnData != null && staticWorld != null)
+            {
+                var dlc = staticWorld.DlcSetting;
+                CampaignSetting = Campaign.Resolve(campaignSetting, dlc);
+                World = World.Create(staticWorld, spawnData, CampaignSetting, seed, Campaign.AvailableWith(dlc), Room);
+            }
+            else
+            {
+                World = new World(seed, Room);
+            }
             if (stage != null) Camera = new RoomCamera(stage, Room, graphics ?? new GraphicsModuleRegistry());
         }
+
+        /// <summary>The campaign setting the world was built with, after falling back from a campaign whose DLC is off.</summary>
+        public string CampaignSetting { get; }
 
         public Room Room { get; }
         public World World { get; }

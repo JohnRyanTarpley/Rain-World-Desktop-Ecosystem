@@ -118,7 +118,9 @@ namespace RWDE.App
                 settings.CampaignSpawnTable, Environment.TickCount, stage);
             sim.World.populationCap = settings.PopulationCap;
             sim.Camera.ApplyPalette(palettes.currentPalette);
-            UserMessages.Log($"World: {sim.World.Creatures.Count} creatures for \"{settings.CampaignSpawnTable}\".");
+            if (sim.CampaignSetting != settings.CampaignSpawnTable)
+                UserMessages.Log($"\"{settings.CampaignSpawnTable}\" needs a DLC that is missing or switched off; using \"{sim.CampaignSetting}\".");
+            UserMessages.Log($"World: {sim.World.Creatures.Count} creatures for \"{sim.CampaignSetting}\".");
 
             var escape = new EscapeHoldQuit();
             var fullscreen = FullscreenPause.ForCurrentUser();

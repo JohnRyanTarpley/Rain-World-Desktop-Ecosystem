@@ -99,5 +99,28 @@ namespace RWDE.App.Tests
             sim.Tick();
             Assert.AreEqual(1, sim.Ticks);
         }
+
+        [Test]
+        public void ABaseOnlyWorldUsesOnlyBaseCampaigns()
+        {
+            var data = new RegionSpawnData("xx", new[]
+            {
+                "ROOMS",
+                "END ROOMS",
+                "CREATURES",
+                "(Gourmand)OFFSCREEN : 0-Green-3",
+                "END CREATURES",
+            });
+
+            var all = new Simulation(new QueuedTerrain(), StaticWorld.Init(StaticWorld.Dlc.BaseOnly), data,
+                Campaign.AllOutskirtsCreatures, 1);
+            var gourmand = new Simulation(new QueuedTerrain(), StaticWorld.Init(StaticWorld.Dlc.BaseOnly), data,
+                "Gourmand", 1);
+
+            CollectionAssert.AreEqual(new[] { Campaign.White, Campaign.Yellow, Campaign.Red }, all.World.SpawnTable.Campaigns);
+            Assert.IsEmpty(all.World.Creatures, "the Gourmand-only line must not spawn without Downpour");
+            Assert.AreEqual(Campaign.AllOutskirtsCreatures, gourmand.CampaignSetting);
+            Assert.IsEmpty(gourmand.World.Creatures);
+        }
     }
 }
