@@ -57,9 +57,22 @@ namespace RWDE.App
             var assets = GameAssetLibrary.Open(new GameAssetOptions { InstallPathOverride = settings.Current.InstallPath });
             if (!assets.Available)
             {
-                UserMessages.ShowError("Rain World Desktop Ecosystem needs an installed copy of Rain World.\n\n"
-                    + assets.UnavailableReason);
-                return ExitNoGame;
+                // The settings window isn't up yet, so ask for the folder here; otherwise a copy outside
+                // Steam, or a saved path that no longer exists, could never be fixed.
+                UserMessages.Print(assets.UnavailableReason);
+                var chosen = InstallPrompt.Ask(assets.UnavailableReason,
+                    path => RainWorldInstallLocator.Locate(path, Array.Empty<string>()).Found);
+                if (chosen == null)
+                    return ExitNoGame;
+                settings.Update(x => x.InstallPath = chosen);
+                UserMessages.Log($"Rain World folder set to {chosen}.");
+                assets = GameAssetLibrary.Open(new GameAssetOptions { InstallPathOverride = chosen });
+                if (!assets.Available)
+                {
+                    UserMessages.ShowError("Rain World Desktop Ecosystem needs an installed copy of Rain World.\n\n"
+                        + assets.UnavailableReason);
+                    return ExitNoGame;
+                }
             }
             if (assets.AtlasExtractionError != null) UserMessages.Print(assets.AtlasExtractionError);
 
