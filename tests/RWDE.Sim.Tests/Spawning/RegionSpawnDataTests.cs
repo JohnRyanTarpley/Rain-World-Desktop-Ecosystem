@@ -110,6 +110,50 @@ namespace RWDE.Sim.Tests.Spawning
         }
 
         [Test]
+        public void AllOnABaseOnlyInstallLeavesDlcCampaignLinesOut()
+        {
+            // A Gourmand-only line and one that excludes every base campaign: only DLC campaigns get them.
+            var data = Inline("ROOMS", "YY_A01 : YY_A02", "YY_A02 : YY_A01", "END ROOMS", "CREATURES",
+                "YY_A01 : 1-Pink",
+                "(Gourmand)YY_A01 : 2-Green",
+                "(X-White,Yellow,Red)YY_A02 : 1-Blue",
+                "(Watcher)YY_A02 : 2-Green",
+                "END CREATURES");
+
+            var baseOnly = data.BuildTable(Campaign.AllOutskirtsCreatures, Campaign.AvailableWith(StaticWorld.Dlc.BaseOnly));
+            var downpour = data.BuildTable(Campaign.AllOutskirtsCreatures, Campaign.AvailableWith(new StaticWorld.Dlc(true, false)));
+
+            CollectionAssert.AreEqual(new[] { "YY_A01.1: 1 PinkLizard" }, Describe(baseOnly));
+            CollectionAssert.AreEquivalent(new[] { "YY_A01.1: 1 PinkLizard", "YY_A01.2: 1 GreenLizard", "YY_A02.1: 1 BlueLizard" },
+                Describe(downpour));
+        }
+
+        [Test]
+        public void CampaignsAreAvailableOnlyWithTheirDlc()
+        {
+            CollectionAssert.AreEqual(new[] { Campaign.White, Campaign.Yellow, Campaign.Red },
+                Campaign.AvailableWith(StaticWorld.Dlc.BaseOnly));
+            var downpour = Campaign.AvailableWith(new StaticWorld.Dlc(true, false));
+            CollectionAssert.Contains(downpour, Campaign.Gourmand);
+            CollectionAssert.Contains(downpour, Campaign.Inv);
+            CollectionAssert.DoesNotContain(downpour, Campaign.Watcher);
+            CollectionAssert.AreEqual(new[] { Campaign.White, Campaign.Yellow, Campaign.Red, Campaign.Watcher },
+                Campaign.AvailableWith(new StaticWorld.Dlc(false, true)));
+            CollectionAssert.AreEqual(Campaign.All, Campaign.AvailableWith(StaticWorld.Dlc.All));
+        }
+
+        [TestCase("Gourmand", false, false, Campaign.AllOutskirtsCreatures)]
+        [TestCase("Gourmand", true, false, "Gourmand")]
+        [TestCase("Watcher", true, false, Campaign.AllOutskirtsCreatures)]
+        [TestCase("Watcher", false, true, "Watcher")]
+        [TestCase("Red", false, false, "Red")]
+        [TestCase(Campaign.AllOutskirtsCreatures, false, false, Campaign.AllOutskirtsCreatures)]
+        public void ACampaignWhoseDlcIsOffFallsBackToAll(string setting, bool downpour, bool watcher, string expected)
+        {
+            Assert.AreEqual(expected, Campaign.Resolve(setting, new StaticWorld.Dlc(downpour, watcher)));
+        }
+
+        [Test]
         public void RepeatedSpawnersWithinACampaignSurviveTheMerge()
         {
             // Two identical lineages in one den are two creatures with their own counters.

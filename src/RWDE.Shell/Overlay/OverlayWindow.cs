@@ -184,6 +184,17 @@ namespace RWDE.Shell.Overlay
         }
 
         /// <summary>
+        /// Sleeps until a message arrives for this thread or <paramref name="timeout"/> passes, whichever
+        /// is first, so a loop with nothing to draw uses no CPU. Call <see cref="PumpMessages"/> after it.
+        /// </summary>
+        public void WaitForMessages(TimeSpan timeout)
+        {
+            if (timeout <= TimeSpan.Zero) return;
+            uint ms = (uint)Math.Min(Math.Ceiling(timeout.TotalMilliseconds), uint.MaxValue - 1);
+            User32.MsgWaitForMultipleObjectsEx(0, null, ms, User32.QS_ALLINPUT, User32.MWMO_INPUTAVAILABLE);
+        }
+
+        /// <summary>
         /// The cursor in the overlay's client pixels, y up (the sprite stage's space). Read from Win32,
         /// since the overlay itself never receives mouse messages.
         /// </summary>
