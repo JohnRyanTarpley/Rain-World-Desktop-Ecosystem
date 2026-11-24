@@ -199,6 +199,38 @@ namespace RWDE.Sim.Tests.AI
         }
 
         [Test]
+        public void GhostsStayInTheRoomTheyWalk()
+        {
+            // Ghosts move along AI-map connections, which the port keeps with room -1 until placed in a room.
+            // Every ghost, cloned ones included, must stay in the room's own index, as in the game.
+            var (observerT, preyT, _) = Cast();
+            var room = OpenRoom().Fill(20, 1, 20, 11, Room.Tile.TerrainType.Solid);
+            var world = new World(4, room);
+            var me = Place(world, room, observerT, 5, 1);
+            var ai = new TestAI(me.abstractCreature, world);
+            ai.NewRoom(room);
+            var prey = Place(world, room, preyT, 15, 1);
+            Tick(room, ai, 40);
+            var rep = (Tracker.ElaborateCreatureRepresentation)ai.tracker.RepresentationForCreature(prey.abstractCreature, false);
+            foreach (var c in prey.bodyChunks)
+            {
+                c.pos = room.MiddleOfTile(30, 1);
+                c.lastPos = c.pos;
+                c.lastLastPos = c.pos;
+            }
+
+            int mostGhosts = 0;
+            for (int t = 0; t < 400; t++)
+            {
+                Tick(room, ai, 1);
+                mostGhosts = System.Math.Max(mostGhosts, rep.ghosts.Count);
+                foreach (var ghost in rep.ghosts)
+                    Assert.AreEqual(room.abstractRoom.index, ghost.coord.room, "ghost left the room at tick " + t);
+            }
+            Assert.Greater(mostGhosts, 1, "ghosts were cloned along a second connection");
+        }
+
+        [Test]
         public void AngerAtARivalRisesTowardItsBaseAndSetAngerOverrides()
         {
             var (observerT, preyT, _) = Cast();

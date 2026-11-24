@@ -445,8 +445,11 @@ namespace RWDE.Sim
                 var bestConnection = default(MovementConnection);
                 float second = -1f;
                 var secondConnection = default(MovementConnection);
-                foreach (var connection in aiTile.outgoingPaths)
+                foreach (var mapConnection in aiTile.outgoingPaths)
                 {
+                    // The game's AI-map connections carry their room's index; the port's carry room -1 until
+                    // placed (MovementConnection.InRoom), so place them in the ghost's room before use.
+                    var connection = mapConnection.InRoom(coord.room);
                     if (!ConnectionLegal(connection))
                         continue;
                     float score = Vector2.Distance(IntVector2.ToVector2(connection.DestTile - connection.StartTile), vel * 100f);

@@ -140,7 +140,9 @@ namespace RWDE.Sim
                     ca.vel -= moveA;
                     cb.pos += moveB;
                     cb.vel += moveB;
-                    if (ca.pos.x == cb.pos.x)
+                    // The game nudges stacked chunks with UnityEngine.Random; the port uses the world's seeded
+                    // random, so a room not yet in a world (tests, or before World adopts it) skips the nudge.
+                    if (ca.pos.x == cb.pos.x && world != null)
                     {
                         ca.vel += Custom.DegToVec(world.random.Value() * 360f) * 0.0001f;
                         cb.vel += Custom.DegToVec(world.random.Value() * 360f) * 0.0001f;

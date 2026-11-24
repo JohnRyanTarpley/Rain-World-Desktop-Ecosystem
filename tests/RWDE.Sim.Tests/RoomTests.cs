@@ -176,6 +176,19 @@ namespace RWDE.Sim.Tests
         }
 
         [Test]
+        public void StackedObjectsCollideInARoomWithoutAWorld()
+        {
+            // Chunks on top of each other get the game's random nudge, which needs the world's random.
+            var room = new Room(10, 10);
+            var a = new TestRock(room, room.MiddleOfTile(5, 5));
+            var b = new TestRock(room, room.MiddleOfTile(5, 5));
+            room.AddObject(a);
+            room.AddObject(b);
+            Assert.IsNull(room.world);
+            Assert.DoesNotThrow(room.Update);
+        }
+
+        [Test]
         public void RemovingAnObjectOutsideTheUpdateLoopTakesItOutAtOnce()
         {
             var room = new Room(4, 3);
