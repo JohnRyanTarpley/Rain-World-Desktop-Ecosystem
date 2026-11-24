@@ -254,9 +254,11 @@ namespace RWDE.UI.Windows
                 campaign.Items.Clear();
                 foreach (var c in choices) campaign.Items.Add(c);
             }
-            // A campaign from a DLC that is now off isn't listed; show the merged table in its place.
-            var selected = choices.FirstOrDefault(c => c.Value == s.CampaignSpawnTable) ?? choices[0];
-            campaign.SelectedItem = selected;
+            // Select the box's own item: the choices above are new objects on every sync, and the box
+            // only accepts an item it holds. A campaign from a DLC that is now off isn't listed; show the
+            // merged table (the first item) in its place.
+            var items = campaign.Items.Cast<CampaignChoice>().ToList();
+            campaign.SelectedItem = items.FirstOrDefault(c => c.Value == s.CampaignSpawnTable) ?? items[0];
         }
 
         void SyncSpecies(Settings s)
