@@ -19,8 +19,23 @@ namespace RWDE.GameAssets
         /// <summary>Steam folders to search; null uses <see cref="RainWorldInstallLocator.DefaultSteamRoots"/>.</summary>
         public IEnumerable<string> SteamRoots;
 
-        /// <summary>DLC mods under <c>StreamingAssets/mods/</c>, in the game's load order.</summary>
-        public IReadOnlyList<string> Mods = new[] { "moreslugcats", "watcher" };
+        /// <summary>
+        /// DLC mods under <c>StreamingAssets/mods/</c>, in the game's load order. Their atlases, world-file
+        /// replacements and modify files are only read for the mods listed, so leave a DLC that is switched
+        /// off out (<see cref="ModsFor"/>); a listed mod that isn't installed is skipped.
+        /// </summary>
+        public IReadOnlyList<string> Mods = ModsFor(Dlc.Downpour | Dlc.Watcher);
+
+        /// <summary>The mod folders for <paramref name="dlc"/>, in the game's load order (Downpour, then The Watcher).</summary>
+        public static IReadOnlyList<string> ModsFor(Dlc dlc)
+        {
+            var mods = new List<string>(2);
+            foreach (var single in new[] { Dlc.Downpour, Dlc.Watcher })
+            {
+                if (dlc.HasFlag(single)) mods.Add(DlcDetector.FolderName(single));
+            }
+            return mods;
+        }
 
         /// <summary>Region folders under <c>world/</c> to index.</summary>
         public IReadOnlyList<string> Regions = new[] { "su" };

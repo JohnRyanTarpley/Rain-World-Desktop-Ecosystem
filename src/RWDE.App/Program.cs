@@ -49,7 +49,13 @@ namespace RWDE.App
             UserMessages.StartLog();
 
             var settings = SettingsStore.Load().Current;
-            var assets = GameAssetLibrary.Open(new GameAssetOptions { InstallPathOverride = settings.InstallPath });
+            // A switched-off DLC's world files and atlases are never read, so its modify files can't
+            // change base-game spawns (the game skips a disabled mod the same way).
+            var assets = GameAssetLibrary.Open(new GameAssetOptions
+            {
+                InstallPathOverride = settings.InstallPath,
+                Mods = GameAssetOptions.ModsFor(DlcSelection.SwitchedOn(settings)),
+            });
             if (!assets.Available)
             {
                 UserMessages.ShowError("Rain World Desktop Ecosystem needs an installed copy of Rain World.\n\n"
@@ -90,7 +96,8 @@ namespace RWDE.App
             // Asset cache: the game's atlases and palettes.
             renderer.RegisterWhiteElement(Futile.atlasManager);
             Futile.atlasManager.UnknownElement += UserMessages.Log;
-            var atlases = GameAtlases.LoadAll(assets, atlas => renderer.LoadAtlas(Futile.atlasManager, atlas));
+            var enabledDlc = DlcSelection.Enabled(settings, assets.InstalledDlc);
+            var atlases = GameAtlases.LoadAll(enabledDlc, assets.GetAtlas, atlas => renderer.LoadAtlas(Futile.atlasManager, atlas));
             foreach (var loaded in atlases.Loaded)
                 UserMessages.Log($"Loaded atlas {loaded}: {loaded.elements.Count} elements, {loaded.textureSize.x}x{loaded.textureSize.y}.");
             foreach (var problem in atlases.Problems) UserMessages.Print(problem);
@@ -107,7 +114,7 @@ namespace RWDE.App
             var spawnData = OutskirtsSpawnData.Load(assets);
             if (spawnData == null) UserMessages.Print("The Outskirts world file is missing from the Rain World install, so no creatures will spawn.");
             var stage = new FStage();
-            var sim = new Simulation(terrain, StaticWorld.Init(EnabledDlc(assets, settings)), spawnData,
+            var sim = new Simulation(terrain, StaticWorld.Init(DlcSelection.ForSim(enabledDlc)), spawnData,
                 settings.CampaignSpawnTable, Environment.TickCount, stage);
             sim.World.populationCap = settings.PopulationCap;
             sim.Camera.ApplyPalette(palettes.currentPalette);
@@ -159,8 +166,5 @@ namespace RWDE.App
         }
 
         /// <summary>The DLC that are both installed and enabled in the settings.</summary>
-        static StaticWorld.Dlc EnabledDlc(GameAssetLibrary assets, Settings settings) => new StaticWorld.Dlc(
-            settings.DownpourEnabled && assets.InstalledDlc.HasFlag(Dlc.Downpour),
-            settings.WatcherEnabled && assets.InstalledDlc.HasFlag(Dlc.Watcher));
     }
 }
