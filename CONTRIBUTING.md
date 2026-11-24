@@ -20,8 +20,10 @@ MIT-licensed and must contain only original work.
 - Everything is loaded at runtime from the user's own Rain World install, found through Steam's
   `libraryfolders.vdf` or a path set in Settings, the same way mods use the game. A Rain World
   install is required; there is no placeholder-art fallback.
-- Content that the game packs into its asset files (the base-game Futile atlases) is extracted on
-  the user's machine into the per-user cache, never into the repository.
+- Content that the game packs into its asset files (the Futile atlases in `resources.assets`,
+  including Downpour's and The Watcher's shared `rainWorldMSC` and `uiSpritesMSC` when installed) is
+  extracted on the user's machine into the per-user cache, never into the repository. Loose files,
+  such as the atlases in a DLC's mod folder, are read from the install where they are.
 
 **Porting game behaviour:**
 - Read the decompiled game code locally to understand behaviour, then write your own

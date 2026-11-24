@@ -39,7 +39,7 @@ Work is split into departments. Each owns a set of projects and the code inside 
 | Project | Target | Department | What it holds |
 |---|---|---|---|
 | `RWDE.Sim` | `net8.0` | ecosystem-sim | The ported game simulation. `Math/` has engine-free stand-ins for Unity types (`Vector2`, `Mathf`, ...) that keep Unity's names and semantics. `Rooms/` has `Room`, tiles, pipes and `ITerrainSource`. `Physics/` has `BodyChunk` and `PhysicalObject`. `AI/` has `AImap`, the path finders and the AI modules. `World/` has the abstract world, world-file loading and spawning. `Creatures/` has creature templates and one folder per species. |
-| `RWDE.GameAssets` | `net8.0` | build-release | `Install/` finds the Rain World install (Steam `libraryfolders.vdf` or a Settings path) and its installed DLC. `Cache/` extracts the packed base-game atlases into the per-user cache and decodes PNGs. `Unity/` reads Unity's asset file format (a file reader, not a Unity dependency). `Merge/` applies mod `modify` files to world files. `GameAssetLibrary` is the read-only API: `GetAtlas`, `GetPalette`, `GetSound`, `GetWorldFile`, `InstalledDlc`. |
+| `RWDE.GameAssets` | `net8.0` | build-release | `Install/` finds the Rain World install (Steam `libraryfolders.vdf` or a Settings path) and its installed DLC. `Cache/` extracts the atlases packed in `resources.assets` (the base game's, and `rainWorldMSC`/`uiSpritesMSC` when a DLC is installed) into the per-user cache and decodes PNGs. `Unity/` reads Unity's asset file format (a file reader, not a Unity dependency). `Merge/` applies mod `modify` files to world files. `GameAssetLibrary` is the read-only API: `GetAtlas`, `GetPalette`, `GetSound`, `GetWorldFile`, `InstalledDlc`. |
 | `RWDE.Shell` | `net8.0-windows` | desktop-shell | `Overlay/` is the frameless, never-focused overlay window and its desktop/topmost modes. `Desktop/` scans the desktop icons. `Terrain/` rasterises icons, the taskbar and screen edges into the sim's tile grid (implements `ITerrainSource`). `Lifecycle/` handles single instance, hold-Escape quit and `--stop`. `Native/` holds all Win32 P/Invoke. |
 | `RWDE.Graphics` | `net8.0-windows` | rendering-animation | `Futile/` is a small port of the Futile sprite layer (`FSprite`, `TriangleMesh`, `FContainer`, `FAtlas`). `Drawing/` has `GraphicsModule`, `RoomCamera` and room palettes. `Direct3D/` is the renderer (Vortice packages). |
 | `RWDE.Audio` | `net8.0-windows` | rendering-animation | Creature sound playback. |
@@ -89,9 +89,13 @@ opens the overlay and runs a test scene (`DesktopProbe`) instead of the full loo
 
 1. **Start.** `RWDE.App` loads `Settings`, then asks `RWDE.GameAssets` for the Rain World
    install. With no install it shows a message saying where it looked and exits.
-2. **Assets.** On first run, `RWDE.GameAssets` extracts the packed base-game atlases into
-   `%APPDATA%/RainWorldDesktop/cache/`. Loose files (palettes, sounds, world files, DLC atlases)
-   are read from the install directly.
+2. **Assets.** On first run, `RWDE.GameAssets` extracts the atlases packed in the game's
+   `resources.assets` into `%APPDATA%/RainWorldDesktop/cache/`: the base game's, plus
+   `rainWorldMSC` and `uiSpritesMSC` when Downpour or The Watcher is installed. It extracts again
+   when the game version or the installed DLC change. Loose files (palettes, sounds, world files,
+   and the atlases in each DLC's mod folder) are read from the install directly. A DLC switched
+   off in settings is left out: its mod folder isn't read, and none of its atlases, cached or
+   loose, are loaded.
 3. **Terrain.** `RWDE.Shell` scans the desktop (icons, taskbar, monitors) and turns it into the
    game's 20 px tile grid. It rescans about once a second and sends a `TerrainDiff` to the sim.
 4. **Simulation.** `RWDE.Sim` loads the Outskirts world file and spawns creatures from the
