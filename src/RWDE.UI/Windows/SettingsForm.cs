@@ -92,6 +92,7 @@ namespace RWDE.UI.Windows
 
         internal bool AdvancedVisible => tabs.TabPages.Contains(advancedPage);
         internal CheckBox RainBox => rain;
+        internal NumericUpDown SpawnRateBox => spawnRate;
         internal CheckBox PerpetualBox => perpetual;
         internal CheckBox DownpourBox => downpour;
         internal CheckBox WatcherBox => watcher;
@@ -200,11 +201,29 @@ namespace RWDE.UI.Windows
             if (dialog.ShowDialog(this) == DialogResult.OK) Change(x => x.InstallPath = dialog.SelectedPath);
         }
 
-        /// <summary>Applies a user change unless the controls are being filled from the settings.</summary>
+        /// <summary>Shows why a change couldn't be saved; replaced in tests.</summary>
+        internal Action<string> ShowSaveError;
+
+        /// <summary>
+        /// Applies a user change unless the controls are being filled from the settings. If the settings
+        /// file can't be written (read-only, disk full), the change isn't kept: the controls go back to
+        /// what is saved and the user is told why.
+        /// </summary>
         void Change(Action<Settings> change)
         {
             if (syncing) return;
-            store.Update(change);
+            try
+            {
+                store.Update(change);
+            }
+            catch (Exception e) when (e is System.IO.IOException || e is UnauthorizedAccessException)
+            {
+                Sync(store.Current);
+                var message = $"Couldn't save the settings, so the change wasn't kept.\n\n{e.Message}\n\n"
+                    + $"Check that this file can be written:\n{store.FilePath}";
+                if (ShowSaveError != null) ShowSaveError(message);
+                else MessageBox.Show(this, message, "Rain World Desktop Ecosystem", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
         }
 
         void OnStoreChanged(object sender, SettingsChangedEventArgs e)
@@ -222,7 +241,8 @@ namespace RWDE.UI.Windows
             try
             {
                 rain.Checked = s.RainEnabled;
-                spawnRate.Value = Math.Clamp((decimal)Math.Round(s.SpawnRate, 1), spawnRate.Minimum, spawnRate.Maximum);
+                // Clamp before converting: a saved rate can be any finite value, and decimal overflows above ~7.9e28.
+                spawnRate.Value = (decimal)Math.Clamp(Math.Round((double)s.SpawnRate, 1), (double)spawnRate.Minimum, (double)spawnRate.Maximum);
                 populationCap.Value = Math.Clamp(s.PopulationCap, (int)populationCap.Minimum, (int)populationCap.Maximum);
                 volume.Value = Math.Clamp((int)Math.Round(s.Volume * 100), volume.Minimum, volume.Maximum);
                 volumeLabel.Text = volume.Value + "%";

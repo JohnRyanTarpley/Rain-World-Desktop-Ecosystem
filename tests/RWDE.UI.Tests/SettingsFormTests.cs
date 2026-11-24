@@ -31,6 +31,37 @@ namespace RWDE.UI.Tests
         SettingsForm Form(DlcAvailability dlc = null) => new SettingsForm(store, dlc ?? DlcAvailability.Everything, commands);
 
         [Test]
+        public void AHugeSavedSpawnRateOpensAtTheMaximum()
+        {
+            // Settings accept any finite rate >= 0; decimal overflows above ~7.9e28.
+            store.Update(s => s.SpawnRate = 1e30f);
+            using var form = Form();
+            Assert.That(form.SpawnRateBox.Value, Is.EqualTo(form.SpawnRateBox.Maximum));
+        }
+
+        [Test]
+        public void ASaveFailureKeepsTheSavedValueAndSaysWhy()
+        {
+            store.Update(s => { }); // writes the file
+            var file = store.FilePath;
+            using var form = Form();
+            string error = null;
+            form.ShowSaveError = message => error = message;
+            System.IO.File.SetAttributes(file, System.IO.FileAttributes.ReadOnly);
+            try
+            {
+                Assert.DoesNotThrow(() => form.RainBox.Checked = false);
+                Assert.That(store.Current.RainEnabled, Is.True, "nothing was saved");
+                Assert.That(form.RainBox.Checked, Is.True, "the control shows the saved value again");
+                Assert.That(error, Does.Contain("Couldn't save").And.Contain(file));
+            }
+            finally
+            {
+                System.IO.File.SetAttributes(file, System.IO.FileAttributes.Normal);
+            }
+        }
+
+        [Test]
         public void AdvancedTabIsHiddenByDefault()
         {
             using var form = Form();

@@ -64,8 +64,16 @@ namespace RWDE.App
                     path => RainWorldInstallLocator.Locate(path, Array.Empty<string>()).Found);
                 if (chosen == null)
                     return ExitNoGame;
-                settings.Update(x => x.InstallPath = chosen);
-                UserMessages.Log($"Rain World folder set to {chosen}.");
+                try
+                {
+                    settings.Update(x => x.InstallPath = chosen);
+                    UserMessages.Log($"Rain World folder set to {chosen}.");
+                }
+                catch (Exception e) when (e is System.IO.IOException || e is UnauthorizedAccessException)
+                {
+                    // Still use it for this run; it will be asked for again next time.
+                    UserMessages.Print($"Using {chosen} for now, but couldn't save it to {settings.FilePath}: {e.Message}");
+                }
                 assets = GameAssetLibrary.Open(new GameAssetOptions { InstallPathOverride = chosen });
                 if (!assets.Available)
                 {
