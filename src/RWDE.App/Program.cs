@@ -2,15 +2,19 @@ using System;
 using System.Diagnostics;
 using System.Linq;
 using RWDE.GameAssets;
+using RWDE.GameAssets.Install;
 using RWDE.Graphics;
 using RWDE.Graphics.Direct3D;
 using RWDE.Shell.Lifecycle;
 using RWDE.Shell.Overlay;
+using RWDE.UI.Configuration;
+using RWDE.UI.Windows;
 
 namespace RWDE.App
 {
     /// <summary>
-    /// The composition root. <c>rwde</c> starts the app in the background; <c>rwde --stop</c> ends it.
+    /// The composition root. <c>rwde</c> starts the app in the background, <c>rwde --stop</c> ends it
+    /// and <c>rwde --settings</c> opens its settings window.
     /// </summary>
     public static class Program
     {
@@ -30,6 +34,12 @@ namespace RWDE.App
                     return ExitOk;
                 }
                 UserMessages.Print("Rain World Desktop Ecosystem is not running.");
+                return ExitNotRunning;
+            }
+            if (args.Contains("--settings", StringComparer.OrdinalIgnoreCase))
+            {
+                if (AppInstance.RequestSettings()) return ExitOk;
+                UserMessages.Print("Rain World Desktop Ecosystem is not running. Start it with: rwde");
                 return ExitNotRunning;
             }
 
@@ -89,6 +99,14 @@ namespace RWDE.App
             palettes.ChangeMainPalette(0);
             UserMessages.Log($"Loaded palette {palettes.paletteA}: black {palettes.currentPalette.blackColor}, fog {palettes.currentPalette.fogColor}.");
 
+            // The settings window and tray icon run on their own UI thread (RWDE.UI).
+            var settings = SettingsStore.Load();
+            var commands = new UiCommandQueue();
+            var dlc = new DlcAvailability(assets.InstalledDlc.HasFlag(Dlc.Downpour), assets.InstalledDlc.HasFlag(Dlc.Watcher));
+            using var settingsUi = SettingsUiHost.Start(settings, dlc, commands);
+            window.SettingsHotkeyPressed += settingsUi.ShowSettings;
+            if (!window.RegisterSettingsHotkey()) UserMessages.Print("Ctrl+Alt+Shift+S is taken by another app; open settings from the tray icon or with `rwde --settings`.");
+
             var stage = new FStage();
             var probe = new DesktopProbe(stage, window);
             var escape = new EscapeHoldQuit();
@@ -98,9 +116,35 @@ namespace RWDE.App
             {
                 if (instance.StopRequested) break;
                 if (escape.Update(OverlayWindow.IsEscapeDown(), clock.Elapsed)) break;
+                if (instance.TakeSettingsRequest()) settingsUi.ShowSettings();
+                if (!HandleUiCommands(commands)) break;
                 probe.Update(clock.Elapsed, escape);
                 renderer.Render(stage);
             }
+        }
+
+        /// <summary>
+        /// Drains what the user asked for in the settings window or tray menu. Returns false on Quit.
+        /// The app doesn't run a <c>World</c> yet, so spawn and reset are only logged until the sim's
+        /// command API exists.
+        /// </summary>
+        static bool HandleUiCommands(UiCommandQueue commands)
+        {
+            while (commands.TryTake(out var command))
+            {
+                switch (command)
+                {
+                    case QuitCommand:
+                        return false;
+                    case SpawnNowCommand spawn:
+                        UserMessages.Log($"Spawn now: {spawn.InternalType} (the sim has no spawn command yet).");
+                        break;
+                    case ResetSimCommand:
+                        UserMessages.Log("Reset requested (the sim has no reset command yet).");
+                        break;
+                }
+            }
+            return true;
         }
     }
 }

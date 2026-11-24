@@ -23,6 +23,9 @@ Stop it by holding Escape for 8 seconds, or from a terminal:
 dotnet run --project src/RWDE.App -- --stop
 ```
 
+Open the settings and spawn window from the tray icon (right-click, Settings), with
+Ctrl+Alt+Shift+S, or with `rwde --settings` (`dotnet run --project src/RWDE.App -- --settings`).
+
 Ctrl+Alt+Shift+R switches between drawing on the desktop layer (behind your windows, the
 default) and on top of every window. The log of the latest run is at
 `%LOCALAPPDATA%\RainWorldDesktop\rwde.log`.
@@ -34,6 +37,7 @@ default) and on top of every window. The log of the latest run is at
 | `src/RWDE.GameAssets` | Finds the Rain World install and reads its assets. |
 | `src/RWDE.Shell` | The overlay window, desktop scanning, Win32. |
 | `src/RWDE.Graphics` | Futile-style sprite layer and the Direct3D 11 renderer. |
-| `src/RWDE.Audio`, `RWDE.Interaction`, `RWDE.UI` | Not started yet. |
+| `src/RWDE.UI` | Settings, their JSON file, and the WinForms settings window and tray icon. |
+| `src/RWDE.Audio`, `RWDE.Interaction` | Not started yet. |
 | `src/RWDE.App` | `rwde.exe`, the composition root. |
 | `tests/` | NUnit tests per project, plus invented fixtures in Rain World's formats. |

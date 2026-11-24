@@ -21,6 +21,7 @@ namespace RWDE.Shell.Overlay
     {
         const string ClassName = "RWDE.Overlay";
         const int ModeHotkeyId = 1;
+        const int SettingsHotkeyId = 2;
 
         // Kept in a static field: the native window class holds this delegate for the process lifetime.
         static User32.WndProc wndProc;
@@ -30,6 +31,7 @@ namespace RWDE.Shell.Overlay
         IntPtr host;
         bool clickThrough = true;
         bool hotkeyRegistered;
+        bool settingsHotkeyRegistered;
 
         OverlayWindow(IntPtr hwnd)
         {
@@ -59,6 +61,9 @@ namespace RWDE.Shell.Overlay
 
         /// <summary>Raised when the mode-toggle hotkey (Ctrl+Alt+Shift+R) is pressed anywhere.</summary>
         public event Action ModeHotkeyPressed;
+
+        /// <summary>Raised when the settings hotkey (Ctrl+Alt+Shift+S) is pressed anywhere.</summary>
+        public event Action SettingsHotkeyPressed;
 
         /// <summary>Creates the window, hidden; call <see cref="SetMode"/> to place and show it.</summary>
         public static OverlayWindow Create()
@@ -159,6 +164,15 @@ namespace RWDE.Shell.Overlay
             return hotkeyRegistered;
         }
 
+        /// <summary>Registers Ctrl+Alt+Shift+S system-wide. Returns false when another app already owns it.</summary>
+        public bool RegisterSettingsHotkey()
+        {
+            if (settingsHotkeyRegistered) return true;
+            settingsHotkeyRegistered = User32.RegisterHotKey(IntPtr.Zero, SettingsHotkeyId,
+                User32.MOD_CONTROL | User32.MOD_ALT | User32.MOD_SHIFT | User32.MOD_NOREPEAT, 'S');
+            return settingsHotkeyRegistered;
+        }
+
         /// <summary>
         /// Handles every waiting message for this thread and returns false once the app should quit.
         /// In desktop mode it also re-attaches to a new wallpaper host after an explorer restart.
@@ -171,6 +185,11 @@ namespace RWDE.Shell.Overlay
                 if (msg.message == User32.WM_HOTKEY && msg.wParam.ToInt32() == ModeHotkeyId)
                 {
                     ModeHotkeyPressed?.Invoke();
+                    continue;
+                }
+                if (msg.message == User32.WM_HOTKEY && msg.wParam.ToInt32() == SettingsHotkeyId)
+                {
+                    SettingsHotkeyPressed?.Invoke();
                     continue;
                 }
                 User32.TranslateMessage(ref msg);
@@ -205,6 +224,8 @@ namespace RWDE.Shell.Overlay
         {
             if (hotkeyRegistered) User32.UnregisterHotKey(IntPtr.Zero, ModeHotkeyId);
             hotkeyRegistered = false;
+            if (settingsHotkeyRegistered) User32.UnregisterHotKey(IntPtr.Zero, SettingsHotkeyId);
+            settingsHotkeyRegistered = false;
             User32.DestroyWindow(hwnd);
         }
 

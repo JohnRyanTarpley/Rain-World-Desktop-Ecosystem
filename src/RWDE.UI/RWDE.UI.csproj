@@ -3,6 +3,8 @@
   <PropertyGroup>
     <TargetFramework>net8.0-windows</TargetFramework>
     <RootNamespace>RWDE.UI</RootNamespace>
+    <!-- The settings window and tray icon (operator, 2026-11-23). WinForms ships with the SDK; no packages. -->
+    <UseWindowsForms>true</UseWindowsForms>
   </PropertyGroup>
 
   <ItemGroup>
