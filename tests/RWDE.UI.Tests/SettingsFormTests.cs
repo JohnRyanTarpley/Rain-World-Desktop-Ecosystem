@@ -31,6 +31,23 @@ namespace RWDE.UI.Tests
         SettingsForm Form(DlcAvailability dlc = null) => new SettingsForm(store, dlc ?? DlcAvailability.Everything, commands);
 
         [Test]
+        public void ALateChangeNotificationDoesNotBringBackOlderSettings()
+        {
+            // A change raised on another thread is queued to the window; by the time it runs, a newer change
+            // can already be saved. Its snapshot is then stale and must not overwrite the controls.
+            using var form = Form();
+            var older = store.Current;
+            store.Update(s => s.RainEnabled = false);
+            Assert.That(form.RainBox.Checked, Is.False);
+
+            var stale = new SettingsChangedEventArgs(older, older);
+            typeof(SettingsForm).GetMethod("OnStoreChanged", BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(form, new object[] { store, stale });
+
+            Assert.That(form.RainBox.Checked, Is.False, "the window shows what is saved, not the late snapshot");
+        }
+
+        [Test]
         public void AHugeSavedSpawnRateOpensAtTheMaximum()
         {
             // Settings accept any finite rate >= 0; decimal overflows above ~7.9e28.

@@ -229,8 +229,11 @@ namespace RWDE.UI.Windows
         void OnStoreChanged(object sender, SettingsChangedEventArgs e)
         {
             if (IsDisposed) return;
-            if (InvokeRequired) BeginInvoke(new Action(() => Sync(e.Current)));
-            else Sync(e.Current);
+            // Always show the store's settings as they are when the sync runs, not the snapshot this event
+            // carried: a change raised on another thread is queued here, and a newer change made in the
+            // window can be applied before it runs.
+            if (InvokeRequired) BeginInvoke(new Action(() => Sync(store.Current)));
+            else Sync(store.Current);
         }
 
         /// <summary>Fills every control from <paramref name="s"/>.</summary>
