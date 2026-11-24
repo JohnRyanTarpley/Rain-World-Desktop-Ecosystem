@@ -9,8 +9,7 @@ namespace RWDE.Sim
     /// Templates are built by <see cref="StaticWorld"/>; every creature of a type shares one.
     /// </summary>
     /// <remarks>
-    /// Left out: <c>breedParameters</c> (comes with <c>LizardBreedParams</c> in the lizard port) and
-    /// the Safari-mode control labels <c>pickupAction</c>/<c>throwAction</c>/<c>jumpAction</c>, which
+    /// Left out: the Safari-mode control labels <c>pickupAction</c>/<c>throwAction</c>/<c>jumpAction</c>, which
     /// only name player-control buttons and never affect behaviour.
     /// </remarks>
     public sealed class CreatureTemplate
@@ -183,6 +182,9 @@ namespace RWDE.Sim
         public int countsAsAKill = 2;
         public int meatPoints;
         public float lungCapacity = 520f;
+
+        /// <summary>Per-breed parameters, e.g. <see cref="LizardBreedParams"/> (<c>CreatureTemplate.breedParameters</c>); inherited from the ancestor.</summary>
+        public BreedParameters breedParameters;
         public bool quickDeath = true;
         public bool wormGrassImmune;
         public bool daddyCorruptionImmune;
@@ -325,6 +327,7 @@ namespace RWDE.Sim
             grasps = a.grasps;
             offScreenSpeed = a.offScreenSpeed;
             abstractedLaziness = a.abstractedLaziness;
+            breedParameters = a.breedParameters;
             stowFoodInDen = a.stowFoodInDen;
             smallCreature = a.smallCreature;
             roamInRoomChance = a.roamInRoomChance;
