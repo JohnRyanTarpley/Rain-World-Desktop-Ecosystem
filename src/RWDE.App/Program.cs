@@ -51,7 +51,10 @@ namespace RWDE.App
             }
             UserMessages.StartLog();
 
-            var assets = GameAssetLibrary.Open();
+            // Settings first: the saved install path (the settings window's picker) chooses the install,
+            // which is how a copy of Rain World outside Steam is found. A new path applies on restart.
+            var settings = SettingsStore.Load();
+            var assets = GameAssetLibrary.Open(new GameAssetOptions { InstallPathOverride = settings.Current.InstallPath });
             if (!assets.Available)
             {
                 UserMessages.ShowError("Rain World Desktop Ecosystem needs an installed copy of Rain World.\n\n"
@@ -61,11 +64,11 @@ namespace RWDE.App
             if (assets.AtlasExtractionError != null) UserMessages.Print(assets.AtlasExtractionError);
 
             UserMessages.Print("Rain World Desktop Ecosystem is running. Hold Escape for 8 seconds or run `rwde --stop` to quit.");
-            Run(instance, assets);
+            Run(instance, assets, settings);
             return ExitOk;
         }
 
-        static void Run(AppInstance instance, GameAssetLibrary assets)
+        static void Run(AppInstance instance, GameAssetLibrary assets, SettingsStore settings)
         {
             using var window = OverlayWindow.Create();
             window.SetMode(OverlayMode.Desktop);
@@ -100,7 +103,6 @@ namespace RWDE.App
             UserMessages.Log($"Loaded palette {palettes.paletteA}: black {palettes.currentPalette.blackColor}, fog {palettes.currentPalette.fogColor}.");
 
             // The settings window and tray icon run on their own UI thread (RWDE.UI).
-            var settings = SettingsStore.Load();
             var commands = new UiCommandQueue();
             var dlc = new DlcAvailability(assets.InstalledDlc.HasFlag(Dlc.Downpour), assets.InstalledDlc.HasFlag(Dlc.Watcher));
             using var settingsUi = SettingsUiHost.Start(settings, dlc, commands);
