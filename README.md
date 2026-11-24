@@ -1,7 +1,9 @@
 # Rain-World-Desktop-Ecosystem
 A "virtual pet" like environment that brings the vibrant ecosystem of Rain World to your desktop!
 
-See [docs/VISION.md](docs/VISION.md) for the project vision.
+See [docs/VISION.md](docs/VISION.md) for the project vision,
+[docs/architecture.md](docs/architecture.md) for the department and project map, and
+[CONTRIBUTING.md](CONTRIBUTING.md) for the IP policy and how to contribute.
 
 ## Requirements
 - Windows 10 or 11 (64-bit)
