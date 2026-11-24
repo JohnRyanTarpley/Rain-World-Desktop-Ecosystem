@@ -147,6 +147,14 @@ namespace RWDE.Sim
         /// Moves the chunk from another object's update. If this object has not updated yet this tick,
         /// the move is deferred to its update so it isn't overwritten.
         /// </summary>
+        /// <summary>
+        /// How visible the chunk is to a viewer with <paramref name="movementBasedVision"/>: moving chunks
+        /// stand out, plus the owner's own bonus (<c>BodyChunk.VisibilityBonus</c>).
+        /// </summary>
+        public float VisibilityBonus(float movementBasedVision) =>
+            Mathf.Clamp(Mathf.Lerp(-movementBasedVision, 1f, Mathf.Pow(Mathf.InverseLerp(1f, 10f, Vector2.Distance(lastPos, pos)), 1f))
+                * movementBasedVision + owner.VisibilityBonus * (1f - movementBasedVision * 0.5f), -1f, 1f);
+
         public void MoveFromOutsideMyUpdate(bool eu, Vector2 moveTo)
         {
             if (owner.evenUpdate == eu)

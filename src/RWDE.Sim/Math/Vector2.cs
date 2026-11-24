@@ -62,6 +62,35 @@ namespace RWDE.Sim
             return LerpUnclamped(a, b, t);
         }
 
+        /// <summary>The unsigned angle in degrees between two vectors (Unity's <c>Vector2.Angle</c>).</summary>
+        public static float Angle(Vector2 from, Vector2 to)
+        {
+            float denominator = (float)Math.Sqrt(from.sqrMagnitude * to.sqrMagnitude);
+            if (denominator < 1E-15f) return 0f;
+            float dot = Dot(from, to) / denominator;
+            dot = dot < -1f ? -1f : dot > 1f ? 1f : dot;
+            return (float)Math.Acos(dot) * 57.29578f;
+        }
+
+        /// <summary>
+        /// Unity's <c>Vector3.Slerp</c> on vectors in the plane, which the game also uses for 2D
+        /// directions: the direction turns through the fraction <paramref name="t"/> (clamped) of the
+        /// angle between them, and the length is interpolated linearly.
+        /// </summary>
+        public static Vector2 Slerp(Vector2 a, Vector2 b, float t)
+        {
+            t = t < 0f ? 0f : t > 1f ? 1f : t;
+            float ma = a.magnitude, mb = b.magnitude;
+            if (ma < kEpsilon || mb < kEpsilon) return LerpUnclamped(a, b, t);
+            double angA = Math.Atan2(a.y, a.x);
+            double delta = Math.Atan2(b.y, b.x) - angA;
+            while (delta > Math.PI) delta -= 2 * Math.PI;
+            while (delta < -Math.PI) delta += 2 * Math.PI;
+            double ang = angA + delta * t;
+            float m = ma + (mb - ma) * t;
+            return new Vector2((float)Math.Cos(ang) * m, (float)Math.Sin(ang) * m);
+        }
+
         public static Vector2 LerpUnclamped(Vector2 a, Vector2 b, float t) =>
             new Vector2(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t);
 

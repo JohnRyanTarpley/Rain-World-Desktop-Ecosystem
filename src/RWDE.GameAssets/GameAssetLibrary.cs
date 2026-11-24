@@ -19,8 +19,31 @@ namespace RWDE.GameAssets
         /// <summary>Steam folders to search; null uses <see cref="RainWorldInstallLocator.DefaultSteamRoots"/>.</summary>
         public IEnumerable<string> SteamRoots;
 
-        /// <summary>DLC mods under <c>StreamingAssets/mods/</c>, in the game's load order.</summary>
-        public IReadOnlyList<string> Mods = new[] { "moreslugcats", "watcher" };
+        /// <summary>
+        /// DLC mods under <c>StreamingAssets/mods/</c>, in the game's load order. The loose files in a mod's
+        /// folder (its atlases, world-file replacements and modify files) are only read for the mods listed,
+        /// so leave a DLC that is switched off out (<see cref="ModsFor"/>); a listed mod that isn't installed
+        /// is skipped.
+        /// </summary>
+        /// <remarks>
+        /// This list does not cover the DLC atlases packed in the game's <c>resources.assets</c>
+        /// (<c>rainWorldMSC</c>, <c>uiSpritesMSC</c>). The cache extracts those for every installed DLC,
+        /// whatever the settings say, because it mirrors the install and is rebuilt whenever the installed
+        /// DLC change; extracting by the settings would rebuild it on every DLC switch. Which atlases are
+        /// loaded is decided later, from the enabled DLC (<c>GameAtlases.LoadAll</c> in RWDE.Graphics).
+        /// </remarks>
+        public IReadOnlyList<string> Mods = ModsFor(Dlc.Downpour | Dlc.Watcher);
+
+        /// <summary>The mod folders for <paramref name="dlc"/>, in the game's load order (Downpour, then The Watcher).</summary>
+        public static IReadOnlyList<string> ModsFor(Dlc dlc)
+        {
+            var mods = new List<string>(2);
+            foreach (var single in new[] { Dlc.Downpour, Dlc.Watcher })
+            {
+                if (dlc.HasFlag(single)) mods.Add(DlcDetector.FolderName(single));
+            }
+            return mods;
+        }
 
         /// <summary>Region folders under <c>world/</c> to index.</summary>
         public IReadOnlyList<string> Regions = new[] { "su" };

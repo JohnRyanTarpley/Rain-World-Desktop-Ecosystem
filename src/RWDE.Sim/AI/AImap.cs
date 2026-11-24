@@ -48,6 +48,7 @@ namespace RWDE.Sim
 
         public AItile getAItile(Vector2 pos) => getAItile(room.GetTilePosition(pos));
         public AItile getAItile(IntVector2 pos) => getAItile(pos.x, pos.y);
+        public AItile getAItile(WorldCoordinate pos) => getAItile(pos.x, pos.y);
 
         public AItile getAItile(int x, int y) =>
             x >= 0 && x < width && y >= 0 && y < height ? map[x, y] : standardTile;
@@ -62,6 +63,7 @@ namespace RWDE.Sim
 
         public int getTerrainProximity(Vector2 pos) => getTerrainProximity(room.GetTilePosition(pos));
         public int getTerrainProximity(IntVector2 pos) => getTerrainProximity(pos.x, pos.y);
+        public int getTerrainProximity(WorldCoordinate pos) => getTerrainProximity(pos.x, pos.y);
 
         public int getTerrainProximity(int x, int y) =>
             x >= 0 && x < width && y >= 0 && y < height ? terrainProximity[x, y] : -1;

@@ -134,6 +134,42 @@ namespace RWDE.GameAssets.Tests
         }
 
         [Test]
+        public void SwitchedOffDlcLeavesWorldFilesAndAtlasesAlone()
+        {
+            _fake.WriteStreamingFile("world/xx/world_xx.txt", "CREATURES\nXX_A01 : 1-Green\nEND CREATURES\n");
+            _fake.WriteStreamingFile("world/xx/displayname.txt", "Base Name\n");
+            // Downpour is installed but switched off: its line edit, replacement file and atlas must not apply.
+            _fake.WriteStreamingFile("mods/moreslugcats/modify/world/xx/world_xx.txt", "[FIND]1-Green\n[REPLACE]1-Pink\n");
+            _fake.WriteStreamingFile("mods/moreslugcats/world/xx/displayname.txt", "Downpour Name\n");
+            _fake.WriteStreamingFile("mods/moreslugcats/atlases/downpourAtlas.png", "png");
+            _fake.WriteStreamingFile("mods/moreslugcats/atlases/downpourAtlas.txt", FakeInstall.AtlasJson);
+            _fake.WriteStreamingFile("mods/watcher/modify/world/xx/world_xx.txt", "[FIND]XX_A01\n[REPLACE]XX_B01\n");
+            var options = _fake.Options();
+            options.Regions = new[] { "xx" };
+            options.Mods = GameAssetOptions.ModsFor(Install.Dlc.Watcher);
+
+            var library = GameAssetLibrary.Open(options);
+            var world = library.GetWorldFile("xx/world_xx.txt").Value;
+
+            CollectionAssert.AreEqual(new[] { "watcher" }, world.AppliedMods);
+            CollectionAssert.Contains(world.Lines, "XX_B01 : 1-Green");
+            CollectionAssert.AreEqual(new[] { "Base Name" }, library.GetWorldFile("xx/displayname.txt").Value.Lines);
+            Assert.IsFalse(library.GetAtlas("downpourAtlas").Found);
+            Assert.AreEqual(Install.Dlc.Downpour | Install.Dlc.Watcher, library.InstalledDlc,
+                "a switched-off DLC is still reported as installed, so its settings switch stays visible");
+        }
+
+        [Test]
+        public void ModsForKeepsTheGameLoadOrder()
+        {
+            CollectionAssert.AreEqual(new[] { "moreslugcats", "watcher" }, GameAssetOptions.ModsFor(Install.Dlc.Watcher | Install.Dlc.Downpour));
+            CollectionAssert.AreEqual(new[] { "moreslugcats" }, GameAssetOptions.ModsFor(Install.Dlc.Downpour));
+            CollectionAssert.AreEqual(new[] { "watcher" }, GameAssetOptions.ModsFor(Install.Dlc.Watcher));
+            CollectionAssert.IsEmpty(GameAssetOptions.ModsFor(Install.Dlc.None));
+            CollectionAssert.AreEqual(new[] { "moreslugcats", "watcher" }, new GameAssetOptions().Mods);
+        }
+
+        [Test]
         public void ModWorldFileReplacesBaseAndUnmergedFilesPassThrough()
         {
             _fake.WriteStreamingFile("world/xx/properties.txt", "Palette: 1\n");

@@ -60,6 +60,41 @@ namespace RWDE.Sim
             White, Yellow, Red, Gourmand, Artificer, Rivulet, Spear, Saint, Inv, Watcher
         };
 
+        /// <summary>
+        /// True when the campaign's content is present: base campaigns always, Downpour's and The Watcher's
+        /// only with that DLC enabled. A campaign from a missing or switched-off DLC has no spawn table
+        /// on the desktop (docs/VISION.md, "Installed DLC").
+        /// </summary>
+        public bool IsAvailableWith(StaticWorld.Dlc dlc)
+        {
+            switch (From)
+            {
+                case Source.Downpour: return dlc.Downpour;
+                case Source.Watcher: return dlc.Watcher;
+                default: return true;
+            }
+        }
+
+        /// <summary>The campaigns available with <paramref name="dlc"/> enabled, in story order.</summary>
+        public static IReadOnlyList<Campaign> AvailableWith(StaticWorld.Dlc dlc)
+        {
+            var available = new List<Campaign>(All.Count);
+            foreach (var c in All)
+                if (c.IsAvailableWith(dlc)) available.Add(c);
+            return available;
+        }
+
+        /// <summary>
+        /// The campaign setting to use with <paramref name="dlc"/> enabled: <paramref name="setting"/>,
+        /// unless it names a campaign whose DLC is missing or switched off, which falls back to
+        /// <see cref="AllOutskirtsCreatures"/> (a saved choice can outlive its DLC switch).
+        /// </summary>
+        public static string Resolve(string setting, StaticWorld.Dlc dlc)
+        {
+            var campaign = IsAll(setting) ? null : Find(setting);
+            return campaign != null && !campaign.IsAvailableWith(dlc) ? AllOutskirtsCreatures : setting;
+        }
+
         /// <summary>The campaign with timeline value <paramref name="timeline"/> (case-sensitive, as the game compares), or null.</summary>
         public static Campaign Find(string timeline)
         {
