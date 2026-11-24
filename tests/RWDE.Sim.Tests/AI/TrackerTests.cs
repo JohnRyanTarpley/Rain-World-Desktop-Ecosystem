@@ -83,8 +83,7 @@ namespace RWDE.Sim.Tests.AI
         {
             for (int i = 0; i < ticks; i++)
             {
-                room.world.Update();
-                room.Update();
+                room.world.Update(); // also updates the room, as the game does each tick
                 ai.Update();
             }
         }
