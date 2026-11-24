@@ -654,7 +654,13 @@ namespace RWDE.Sim
                 {
                     SendCommunication(otherLizard, LizardCommunication.Submission);
                     agressionTracker.SetAnger(tracker.RepresentationForObject(otherLizard, false), 0f, 0f);
-                    submittedTo = tracker.RepresentationForObject(otherLizard, false).representedCreature;
+                    // The sender can be in sight without being tracked yet (the tracker notices one random
+                    // creature a tick). The game then throws a NullReferenceException on this line, which
+                    // Unity logs before skipping the rest; stop at the same point instead of crashing the sim.
+                    var submitRep = tracker.RepresentationForObject(otherLizard, false);
+                    if (submitRep == null)
+                        return;
+                    submittedTo = submitRep.representedCreature;
                     missionTracker.AddMission(new MissionTracker.LeaveRoom(missionTracker, 0.4f, 1000), false);
                 }
             }

@@ -132,5 +132,58 @@ namespace RWDE.Sim.Tests
         {
             Assert.Throws<System.ArgumentException>(() => new TileState(Room.Tile.TerrainType.ShortcutEntrance));
         }
+
+        // Counts its updates; can take other objects (and itself) out of the room when it updates.
+        private sealed class Counter : UpdatableAndDeletable
+        {
+            public int updates;
+            public UpdatableAndDeletable[] removeOnUpdate = new UpdatableAndDeletable[0];
+
+            public override void Update(bool eu)
+            {
+                base.Update(eu);
+                updates++;
+                var from = room;
+                foreach (var obj in removeOnUpdate)
+                    from.RemoveObject(obj);
+            }
+        }
+
+        [Test]
+        public void ObjectsRemovedMidUpdateDontMakeOthersUpdateTwice()
+        {
+            // As a carrier entering a pipe takes itself and its prey out of the room: [prey, carrier, other].
+            // The loop runs newest first, so "other" updates before the carrier removes the two entries below it.
+            var room = new Room(4, 3);
+            var prey = new Counter();
+            var carrier = new Counter();
+            var other = new Counter();
+            carrier.removeOnUpdate = new UpdatableAndDeletable[] { carrier, prey };
+            room.AddObject(prey);
+            room.AddObject(carrier);
+            room.AddObject(other);
+
+            room.Update();
+
+            Assert.AreEqual(1, other.updates, "Room.RemoveObject leaves entries the loop hasn't reached, so nothing shifts");
+            Assert.AreEqual(1, carrier.updates);
+            Assert.AreEqual(0, prey.updates, "removed before its turn, it is cleared out, not updated");
+            CollectionAssert.AreEqual(new[] { other }, room.updateList);
+
+            room.Update();
+            Assert.AreEqual(2, other.updates);
+            Assert.AreEqual(1, carrier.updates);
+        }
+
+        [Test]
+        public void RemovingAnObjectOutsideTheUpdateLoopTakesItOutAtOnce()
+        {
+            var room = new Room(4, 3);
+            var obj = new Counter();
+            room.AddObject(obj);
+            room.RemoveObject(obj);
+            Assert.IsEmpty(room.updateList);
+            Assert.IsNull(obj.room);
+        }
     }
 }

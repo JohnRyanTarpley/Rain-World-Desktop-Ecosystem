@@ -15,6 +15,9 @@ namespace RWDE.Sim
         /// <summary>Flips every tick, standing in for <c>RainWorldGame.evenUpdate</c>.</summary>
         public bool evenUpdate;
 
+        /// <summary>The update loop's position in <see cref="updateList"/>, <c>int.MaxValue</c> outside it (<c>Room.updateIndex</c>).</summary>
+        private int updateIndex = int.MaxValue;
+
         /// <summary>
         /// Adds <paramref name="obj"/> to the room (<c>Room.AddObject</c>). A creature also joins
         /// <see cref="AbstractRoom.creatures"/>, which the game keeps up through its abstract objects.
@@ -22,7 +25,16 @@ namespace RWDE.Sim
         public void AddObject(UpdatableAndDeletable obj)
         {
             if (updateList.Contains(obj))
+            {
+                // Removed earlier in this update loop but not cleared out yet (see RemoveObject): it is
+                // back, so the loop must keep it.
+                if (obj.room != this)
+                {
+                    obj.room = this;
+                    obj.slatedForDeletetion = false;
+                }
                 return;
+            }
             obj.room = this;
             obj.slatedForDeletetion = false;
             updateList.Add(obj);
@@ -37,6 +49,11 @@ namespace RWDE.Sim
         {
             if (obj.room == this)
                 obj.RemoveFromRoom();
+            // Room.RemoveObject: during the update loop, an object the loop hasn't reached yet (or is
+            // updating now) stays in the list for the loop to clear out, so the entries below it don't
+            // shift and nothing is updated twice. Outside the loop it goes at once.
+            if (updateList.IndexOf(obj) <= updateIndex && updateIndex != int.MaxValue)
+                return;
             updateList.Remove(obj);
             if (obj is PhysicalObject physical)
                 physicalObjects[physical.collisionLayer].Remove(physical);
@@ -53,11 +70,9 @@ namespace RWDE.Sim
         public void Update()
         {
             evenUpdate = !evenUpdate;
-            for (int i = updateList.Count - 1; i >= 0; i--)
+            for (updateIndex = updateList.Count - 1; updateIndex >= 0; updateIndex--)
             {
-                if (i >= updateList.Count)
-                    continue;
-                var obj = updateList[i];
+                var obj = updateList[updateIndex];
                 if (obj.slatedForDeletetion || obj.room != this)
                 {
                     CleanOutObjectNotInThisRoom(obj);
@@ -67,6 +82,7 @@ namespace RWDE.Sim
                 if (obj.slatedForDeletetion || obj.room != this)
                     CleanOutObjectNotInThisRoom(obj);
             }
+            updateIndex = int.MaxValue;
 
             for (int n = 1; n < physicalObjects.Length; n++)
             {
@@ -88,7 +104,13 @@ namespace RWDE.Sim
                     abstractRoom.creatures.Remove(creature.abstractCreature);
             }
             if (obj.slatedForDeletetion && obj is Creature dead)
+            {
                 abstractRoom.creatures.Remove(dead.abstractCreature);
+                // The game destroys the abstract creature here, taking it out of the world. The desktop's
+                // population is World.creatures, so leave that too, or the destroyed body keeps a slot
+                // under the population cap for good.
+                world?.RemoveCreature(dead.abstractCreature);
+            }
         }
 
         // The object-object collision in Room.Update. Objects one of which holds the other don't collide.

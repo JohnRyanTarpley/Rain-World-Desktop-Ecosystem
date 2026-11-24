@@ -340,5 +340,52 @@ namespace RWDE.Sim.Tests.Creatures
             Assert.IsEmpty(room.updateList);
             Assert.IsEmpty(room.abstractRoom.creatures);
         }
+
+        [Test]
+        public void ADestroyedLizardLeavesTheWorldsPopulation()
+        {
+            var room = Box(30, 8);
+            var world = new World(3, room) { realizer = new CreatureRealizer() };
+            var body = Realize(world, room, Type.GreenLizard, T(10, 1));
+            var creature = body.abstractCreature;
+            // Counted in the world's population as a spawned lizard that walked in would be.
+            var population = (List<AbstractCreature>)typeof(World)
+                .GetField("creatures", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                .GetValue(world);
+            population.Add(creature);
+            world.Update();
+            Assert.AreEqual(1, world.CreaturesInRooms.Count());
+
+            // Room.CleanOutObjectNotInThisRoom destroys the abstract creature along with the body.
+            body.Die();
+            body.Destroy();
+            world.Update();
+
+            CollectionAssert.DoesNotContain(world.Creatures, creature, "no longer holds a slot under the population cap");
+            Assert.AreEqual(0, world.CreaturesInRooms.Count());
+            Assert.IsNull(creature.realizedCreature);
+            CollectionAssert.DoesNotContain(room.updateList, body);
+            CollectionAssert.DoesNotContain(room.abstractRoom.creatures, creature);
+        }
+
+        [Test]
+        public void ADisplayFromAVisibleButUntrackedLizardDoesNotCrash()
+        {
+            // LizardAI.RecieveCommunication: on its 1-in-24 submission roll the game dereferences the sender's
+            // representation without checking it. The tracker notices one creature a tick, so a lizard in
+            // sight can still be untracked; the game throws there and Unity skips the rest.
+            var room = Box(30, 8);
+            var world = new World(4, room);
+            var receiver = Realize(world, room, Type.GreenLizard, T(6, 1), 1);
+            var sender = Realize(world, room, Type.GreenLizard, T(14, 1), 2);
+            Assert.IsNull(receiver.AI.tracker.RepresentationForObject(sender, false), "the receiver hasn't noticed the sender");
+
+            Assert.DoesNotThrow(() =>
+            {
+                for (int i = 0; i < 2000; i++)
+                    receiver.AI.RecieveCommunication(sender, LizardAI.LizardCommunication.Agression);
+            });
+            Assert.IsNull(receiver.AI.submittedTo, "it can't submit to a lizard it doesn't track");
+        }
     }
 }
