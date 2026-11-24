@@ -10,11 +10,13 @@ using RWDE.Shell.Overlay;
 using RWDE.Shell.Terrain;
 using RWDE.Sim;
 using RWDE.UI.Configuration;
+using RWDE.UI.Windows;
 
 namespace RWDE.App
 {
     /// <summary>
-    /// The composition root. <c>rwde</c> starts the app in the background; <c>rwde --stop</c> ends it.
+    /// The composition root. <c>rwde</c> starts the app in the background, <c>rwde --stop</c> ends it
+    /// and <c>rwde --settings</c> opens its settings window.
     /// </summary>
     public static class Program
     {
@@ -39,6 +41,12 @@ namespace RWDE.App
                 UserMessages.Print("Rain World Desktop Ecosystem is not running.");
                 return ExitNotRunning;
             }
+            if (args.Contains("--settings", StringComparer.OrdinalIgnoreCase))
+            {
+                if (AppInstance.RequestSettings()) return ExitOk;
+                UserMessages.Print("Rain World Desktop Ecosystem is not running. Start it with: rwde");
+                return ExitNotRunning;
+            }
 
             using var instance = AppInstance.TryClaim();
             if (instance == null)
@@ -48,7 +56,10 @@ namespace RWDE.App
             }
             UserMessages.StartLog();
 
-            var settings = SettingsStore.Load().Current;
+            // Settings first: the saved install path (the settings window's picker) chooses the install,
+            // which is how a copy of Rain World outside Steam is found. A new path applies on restart.
+            var settingsStore = SettingsStore.Load();
+            var settings = settingsStore.Current;
             // A switched-off DLC's world files and atlases are never read, so its modify files can't
             // change base-game spawns (the game skips a disabled mod the same way).
             var assets = GameAssetLibrary.Open(new GameAssetOptions
@@ -58,19 +69,46 @@ namespace RWDE.App
             });
             if (!assets.Available)
             {
-                UserMessages.ShowError("Rain World Desktop Ecosystem needs an installed copy of Rain World.\n\n"
-                    + assets.UnavailableReason);
-                return ExitNoGame;
+                // The settings window isn't up yet, so ask for the folder here; otherwise a copy outside
+                // Steam, or a saved path that no longer exists, could never be fixed.
+                UserMessages.Print(assets.UnavailableReason);
+                var chosen = InstallPrompt.Ask(assets.UnavailableReason,
+                    path => RainWorldInstallLocator.Locate(path, Array.Empty<string>()).Found);
+                if (chosen == null)
+                    return ExitNoGame;
+                try
+                {
+                    settingsStore.Update(x => x.InstallPath = chosen);
+                    UserMessages.Log($"Rain World folder set to {chosen}.");
+                }
+                catch (Exception e) when (e is System.IO.IOException || e is UnauthorizedAccessException)
+                {
+                    // Still use it for this run; it will be asked for again next time.
+                    UserMessages.Print($"Using {chosen} for now, but couldn't save it to {settingsStore.FilePath}: {e.Message}");
+                }
+                settings = settingsStore.Current;
+                assets = GameAssetLibrary.Open(new GameAssetOptions
+                {
+                    InstallPathOverride = chosen,
+                    Mods = GameAssetOptions.ModsFor(DlcSelection.SwitchedOn(settings)),
+                });
+                if (!assets.Available)
+                {
+                    UserMessages.ShowError("Rain World Desktop Ecosystem needs an installed copy of Rain World.\n\n"
+                        + assets.UnavailableReason);
+                    return ExitNoGame;
+                }
             }
             if (assets.AtlasExtractionError != null) UserMessages.Print(assets.AtlasExtractionError);
 
             UserMessages.Print("Rain World Desktop Ecosystem is running. Hold Escape for 8 seconds or run `rwde --stop` to quit.");
-            Run(instance, assets, settings);
+            Run(instance, assets, settingsStore);
             return ExitOk;
         }
 
-        static void Run(AppInstance instance, GameAssetLibrary assets, Settings settings)
+        static void Run(AppInstance instance, GameAssetLibrary assets, SettingsStore settingsStore)
         {
+            var settings = settingsStore.Current;
             using var window = OverlayWindow.Create();
             window.SetMode(settings.DisplayMode);
             if (window.DesktopModeProblem != null) UserMessages.Print(window.DesktopModeProblem);
@@ -107,6 +145,13 @@ namespace RWDE.App
             palettes.ChangeMainPalette(0);
             UserMessages.Log($"Loaded palette {palettes.paletteA}: black {palettes.currentPalette.blackColor}, fog {palettes.currentPalette.fogColor}.");
 
+            // The settings window and tray icon run on their own UI thread (RWDE.UI).
+            var commands = new UiCommandQueue();
+            var dlc = new DlcAvailability(assets.InstalledDlc.HasFlag(Dlc.Downpour), assets.InstalledDlc.HasFlag(Dlc.Watcher));
+            using var settingsUi = SettingsUiHost.Start(settingsStore, dlc, commands);
+            window.SettingsHotkeyPressed += settingsUi.ShowSettings;
+            if (!window.RegisterSettingsHotkey()) UserMessages.Print("Ctrl+Alt+Shift+S is taken by another app; open settings from the tray icon or with `rwde --settings`.");
+
             // Terrain source and world.
             var terrain = new DesktopTerrainSource(new Win32DesktopLayoutSource());
             UserMessages.Log($"Desktop room: {terrain.Width}x{terrain.Height} tiles from {terrain.Layout.Icons.Count} icons.");
@@ -133,6 +178,8 @@ namespace RWDE.App
                 var now = clock.Elapsed;
                 if (instance.StopRequested) break;
                 if (escape.Update(OverlayWindow.IsEscapeDown(), now)) break;
+                if (instance.TakeSettingsRequest()) settingsUi.ShowSettings();
+                if (!HandleUiCommands(commands)) break;
 
                 bool wasPaused = fullscreen.Paused;
                 if (fullscreen.Update(now))
@@ -161,12 +208,28 @@ namespace RWDE.App
                 }
                 else
                 {
-                    // Nothing on screen changes: sleep until the next tick or the next message.
                     window.WaitForMessages(ticks.UntilNextTick);
                 }
             }
         }
 
-        /// <summary>The DLC that are both installed and enabled in the settings.</summary>
+        static bool HandleUiCommands(UiCommandQueue commands)
+        {
+            while (commands.TryTake(out var command))
+            {
+                switch (command)
+                {
+                    case QuitCommand:
+                        return false;
+                    case SpawnNowCommand spawn:
+                        UserMessages.Log($"Spawn now: {spawn.InternalType} (the sim has no spawn command yet).");
+                        break;
+                    case ResetSimCommand:
+                        UserMessages.Log("Reset requested (the sim has no reset command yet).");
+                        break;
+                }
+            }
+            return true;
+        }
     }
 }

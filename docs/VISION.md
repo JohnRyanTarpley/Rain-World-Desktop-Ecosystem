@@ -42,7 +42,10 @@ intentional difference is the environment: the desktop replaces the room.
   sometimes cover taskbar icons. In desktop mode this needs its own small topmost surface
   over the taskbar, because the desktop layer sits beneath the taskbar.
 - **Quitting:** hold Escape for 8 seconds (detected globally, since the app never has
-  focus), or run the stop command from a terminal. There is no tray icon or quit button.
+  focus), run the stop command from a terminal, or choose Quit on the tray icon.
+- **Settings window:** a tray icon in the taskbar notification area opens it (right-click,
+  Settings; or double-click). `rwde --settings` and Ctrl+Alt+Shift+S also open it (operator,
+  2026-11-23).
 - **Installed and removed from the terminal.** Install, uninstall, start, stop and
   start-at-login all work from a terminal.
 
