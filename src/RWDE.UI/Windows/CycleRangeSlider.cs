@@ -132,6 +132,21 @@ namespace RWDE.UI.Windows
         protected override void OnMouseUp(MouseEventArgs e)
         {
             base.OnMouseUp(e);
+            EndDrag();
+        }
+
+        protected override void OnMouseCaptureChanged(EventArgs e)
+        {
+            base.OnMouseCaptureChanged(e);
+            // Capture lost mid-drag (the button released over another app, a dialog popping up): the
+            // MouseUp will never come, so end the drag where the handle is instead of letting it follow
+            // the cursor with no button held.
+            EndDrag();
+        }
+
+        /// <summary>Ends a drag and commits the values; does nothing when no drag is running.</summary>
+        void EndDrag()
+        {
             if (!dragging) return;
             dragging = false;
             Capture = false;

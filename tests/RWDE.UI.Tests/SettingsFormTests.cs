@@ -1,4 +1,7 @@
+using System;
+using System.Reflection;
 using System.Threading;
+using System.Windows.Forms;
 using NUnit.Framework;
 using RWDE.Tests.Common;
 using RWDE.UI.Configuration;
@@ -124,6 +127,41 @@ namespace RWDE.UI.Tests
                 if (c.Value == "Red") form.CampaignBox.SelectedItem = c;
             Assert.That(store.Current.CampaignSpawnTable, Is.EqualTo("Red"));
         }
+
+        [Test]
+        public void CampaignChangedOutsideTheWindowIsShown()
+        {
+            using var form = Form();
+            store.Update(s => s.CampaignSpawnTable = "Red");
+            Assert.That(((CampaignChoice)form.CampaignBox.SelectedItem).Value, Is.EqualTo("Red"));
+            store.Update(s => s.CampaignSpawnTable = "White");
+            Assert.That(((CampaignChoice)form.CampaignBox.SelectedItem).Value, Is.EqualTo("White"));
+        }
+
+        [Test]
+        public void CycleDragEndsWhenMouseCaptureIsLost()
+        {
+            using var slider = new CycleRangeSlider { Width = 400 };
+            slider.SetValues(400, 800);
+            int committed = 0;
+            slider.ValuesCommitted += (s, e) => committed++;
+            int lowX = (int)Call(slider, "XFor", 400);
+
+            Call(slider, "OnMouseDown", new MouseEventArgs(MouseButtons.Left, 1, lowX, 5, 0));
+            Call(slider, "OnMouseCaptureChanged", EventArgs.Empty);
+            int lowAfterDrag = slider.LowSeconds;
+            // Back over the slider with no button held: the handle must stay put.
+            Call(slider, "OnMouseMove", new MouseEventArgs(MouseButtons.None, 0, lowX + 60, 5, 0));
+
+            Assert.That(committed, Is.EqualTo(1), "losing capture commits the drag once");
+            Assert.That(slider.LowSeconds, Is.EqualTo(lowAfterDrag));
+            Call(slider, "OnMouseUp", new MouseEventArgs(MouseButtons.Left, 1, lowX + 60, 5, 0));
+            Assert.That(committed, Is.EqualTo(1), "a late MouseUp doesn't commit again");
+        }
+
+        static object Call(object target, string method, params object[] args) =>
+            target.GetType().GetMethod(method, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
+                .Invoke(target, args);
 
         [Test]
         public void SpawnNowPostsACommand()
