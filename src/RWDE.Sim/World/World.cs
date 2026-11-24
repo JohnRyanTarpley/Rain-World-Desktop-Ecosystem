@@ -44,6 +44,9 @@ namespace RWDE.Sim
         /// <summary>Shares the pathfinders' work per tick (<c>RainWorldGame.pathfinderResourceDivider</c>).</summary>
         public readonly PathfinderResourceDivider pathfinderResourceDivider = new PathfinderResourceDivider();
 
+        /// <summary>Takes in creatures that crawl into a shortcut (<c>RainWorldGame.shortcuts</c>); null until the shortcut system is set up.</summary>
+        public IShortcutHandler shortcuts;
+
         public int firstRoomIndex => 0;
         public int NumberOfRooms => abstractRooms.Length;
 

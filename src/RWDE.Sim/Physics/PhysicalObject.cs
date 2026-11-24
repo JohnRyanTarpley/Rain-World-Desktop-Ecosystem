@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace RWDE.Sim
 {
     /// <summary>
@@ -120,7 +122,7 @@ namespace RWDE.Sim
         public float buoyancy { get; protected set; }
 
         /// <summary>True while a creature holds this object; held objects skip the room-range clamp.</summary>
-        public virtual bool IsGrabbed => false;
+        public virtual bool IsGrabbed => grabbedBy.Count > 0;
 
         public bool GoThroughFloors
         {
@@ -205,11 +207,61 @@ namespace RWDE.Sim
             {
                 bodyChunks[i].Update();
             }
+            ChunksMoved();
             for (int j = 0; j < bodyChunkConnections.Length; j++)
             {
                 bodyChunkConnections[j].Update();
             }
+            for (int k = grabbedBy.Count - 1; k >= 0; k--)
+            {
+                if (grabbedBy[k].discontinued || grabbedBy[k].grabber.grasps[grabbedBy[k].graspUsed] != grabbedBy[k])
+                    grabbedBy.RemoveAt(k);
+            }
             base.Update(eu);
+        }
+
+        /// <summary>
+        /// Called each tick right after the chunks moved. The game updates the abstract object's tile here
+        /// (<c>abstractPhysicalObject.pos.Tile</c>); <see cref="Creature"/> does that for its abstract creature.
+        /// </summary>
+        protected virtual void ChunksMoved()
+        {
+        }
+
+        /// <summary>The grasps holding this object (<c>PhysicalObject.grabbedBy</c>).</summary>
+        public readonly List<Creature.Grasp> grabbedBy = new List<Creature.Grasp>();
+
+        /// <summary>How much easier (positive) or harder (negative) the object is to see (<c>PhysicalObject.VisibilityBonus</c>).</summary>
+        public virtual float VisibilityBonus => 0f;
+
+        /// <summary>The object came into a new room (<c>PhysicalObject.NewRoom</c>).</summary>
+        public virtual void NewRoom(Room newRoom)
+        {
+        }
+
+        /// <summary>Adds the object to <paramref name="placeRoom"/> (<c>PhysicalObject.PlaceInRoom</c>).</summary>
+        public virtual void PlaceInRoom(Room placeRoom)
+        {
+            placeRoom.AddObject(this);
+        }
+
+        /// <summary>One of this object's chunks touched one of <paramref name="otherObject"/>'s (<c>PhysicalObject.Collide</c>).</summary>
+        public virtual void Collide(PhysicalObject otherObject, int myChunk, int otherChunk)
+        {
+        }
+
+        /// <summary>A creature took hold of this object (<c>PhysicalObject.Grabbed</c>).</summary>
+        public virtual void Grabbed(Creature.Grasp grasp)
+        {
+            GoThroughFloors = true;
+            grabbedBy.Add(grasp);
+        }
+
+        /// <summary>Every creature holding this object lets go (<c>PhysicalObject.AllGraspsLetGoOfThisObject</c>).</summary>
+        public void AllGraspsLetGoOfThisObject(bool evenNonExlusive)
+        {
+            for (int i = grabbedBy.Count - 1; i >= 0; i--)
+                grabbedBy[i].grabber.ReleaseGrasp(grabbedBy[i].graspUsed);
         }
 
         /// <summary>Pushes every chunk except <paramref name="exceptedChunk"/> out of a circle.</summary>

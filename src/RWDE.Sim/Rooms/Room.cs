@@ -8,7 +8,7 @@ namespace RWDE.Sim
     /// Names and coordinate rules follow the game's <c>Room</c> so ported code reads the same:
     /// tile (0, 0) is bottom-left, y points up, and tile (x, y) covers pixels [20x, 20x + 20).
     /// </summary>
-    public sealed class Room
+    public sealed partial class Room
     {
         /// <summary>Tile edge length in pixels. The game hardcodes 20f throughout <c>Room</c>.</summary>
         public const float TileSize = 20f;

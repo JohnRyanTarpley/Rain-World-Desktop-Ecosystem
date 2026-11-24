@@ -12,7 +12,7 @@ namespace RWDE.Sim
     /// world file. On the desktop both follow the pipes: each room-exit pipe makes an Exit node, and the
     /// <see cref="World"/> joins exit nodes whose pipes share a <see cref="Pipe.RoomLink"/>.
     /// </remarks>
-    public sealed class AbstractRoom
+    public sealed partial class AbstractRoom
     {
         internal AbstractRoom(Room realizedRoom)
         {

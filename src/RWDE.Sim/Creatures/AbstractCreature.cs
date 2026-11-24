@@ -65,6 +65,8 @@ namespace RWDE.Sim
             this.creatureTemplate = creatureTemplate;
             this.pos = pos;
             abstractAI = new AbstractCreatureAI(world, this);
+            // The AbstractCreature constructor's state choice. Other species' own states arrive with their ports.
+            state = creatureTemplate.IsLizard ? new LizardState(this) : (CreatureState)new HealthState(this);
             personality = new Personality(ID);
         }
 
@@ -127,6 +129,18 @@ namespace RWDE.Sim
         public readonly List<string> unrecognizedFlags = new List<string>();
 
         public AbstractRoom Room => world.GetAbstractRoom(pos);
+
+        /// <summary>Alive or dead, health and the like (<c>AbstractCreature.state</c>).</summary>
+        public CreatureState state;
+
+        /// <summary>The body while the creature is in a room, else null (<c>AbstractCreature.realizedCreature</c>).</summary>
+        public Creature realizedCreature;
+
+        /// <summary>The creature died (<c>AbstractCreature.Die</c>).</summary>
+        public void Die()
+        {
+            state.Die();
+        }
 
         public bool InDen => place == Place.InDen;
         public bool Realized => place == Place.InRoom;
@@ -201,5 +215,36 @@ namespace RWDE.Sim
         public readonly List<WorldCoordinate> path = new List<WorldCoordinate>();
         /// <summary>The realized AI, while the creature is in a room.</summary>
         public ArtificialIntelligence RealAI;
+
+        /// <summary>
+        /// The den the creature returns to (<c>AbstractCreatureAI.denPosition</c>). Desktop rooms have no
+        /// den nodes (the offscreen world stands in for every den), so this stays null unless set.
+        /// </summary>
+        public WorldCoordinate? denPosition;
+
+        /// <summary>
+        /// Sets where the creature is heading (<c>AbstractCreatureAI.SetDestination</c>). While it is
+        /// realized, its pathfinder takes the new destination too.
+        /// </summary>
+        public void SetDestination(WorldCoordinate newDest)
+        {
+            destination = newDest;
+            if (parent.realizedCreature != null && RealAI != null)
+            {
+                RealAI.SetDestination(newDest);
+                // Every desktop room is as attractive as any other, so a set migration destination is
+                // only replaced once reached.
+                if (newDest.room != parent.pos.room && MigrationDestination != newDest && !migrationDestination.HasValue)
+                    migrationDestination = newDest;
+            }
+        }
+
+        private WorldCoordinate? migrationDestination;
+
+        /// <summary>Whether the creature means to go to another room (<c>AbstractCreatureAI.WantToMigrate</c>).</summary>
+        public bool WantToMigrate => migrationDestination.HasValue && migrationDestination.Value.room != parent.pos.room;
+
+        /// <summary>Where it means to migrate to, else its destination (<c>AbstractCreatureAI.MigrationDestination</c>).</summary>
+        public WorldCoordinate MigrationDestination => WantToMigrate ? migrationDestination.Value : destination;
     }
 }
