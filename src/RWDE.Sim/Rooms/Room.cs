@@ -169,6 +169,7 @@ namespace RWDE.Sim
 
         public Vector2 MiddleOfTile(int x, int y) => new Vector2(10f + x * 20f, 10f + y * 20f);
         public Vector2 MiddleOfTile(IntVector2 pos) => MiddleOfTile(pos.x, pos.y);
+        public Vector2 MiddleOfTile(WorldCoordinate pos) => MiddleOfTile(pos.x, pos.y);
         public Vector2 MiddleOfTile(Vector2 pos) => MiddleOfTile(GetTilePosition(pos));
 
         public FloatRect TileRect(IntVector2 pos) =>
@@ -182,6 +183,7 @@ namespace RWDE.Sim
 
         public Tile GetTile(Vector2 pos) => GetTile(GetTilePosition(pos));
         public Tile GetTile(IntVector2 pos) => GetTile(pos.x, pos.y);
+        public Tile GetTile(WorldCoordinate pos) => GetTile(pos.x, pos.y);
 
         /// <summary>
         /// The tile at (<paramref name="x"/>, <paramref name="y"/>). Outside the room this is

@@ -72,12 +72,15 @@ namespace RWDE.Sim
 
         /// <summary>
         /// Call once per tick, before any pathfinder updates (the game does this in <c>RainWorldGame.Update</c>).
-        /// Also moves the offscreen population (see <c>World.Population.cs</c>).
+        /// Also moves the offscreen population (see <c>World.Population.cs</c>), then ticks every room's
+        /// objects, as the game updates each realized room after the world.
         /// </summary>
         public void Update()
         {
             pathfinderResourceDivider.Update();
             UpdatePopulation();
+            for (int i = 0; i < abstractRooms.Length; i++)
+                abstractRooms[i].realizedRoom.Update();
         }
 
         /// <summary>Both rooms' exit shortcut lengths added up (<c>World.TotalShortCutLengthBetweenTwoConnectedRooms</c>).</summary>
